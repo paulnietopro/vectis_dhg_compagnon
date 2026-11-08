@@ -2,7 +2,7 @@ VectisDHG Compagnon (iPhone) — consultation + post-it
 
 CE QUE FAIT L'APPLICATION
 - Consulter : dotation, heures ventilées, reste à utiliser, services à ventiler, disciplines, enseignants.
-- Modifier uniquement les post-it des disciplines.
+- Modifier les post-it, les heures ventilées et les enseignants (ajout, nom, ORS), puis reporter ces modifications sur l'ordinateur.
 - Tout reste sur le téléphone : aucune donnée n'est envoyée sur Internet.
 
 MISE EN PLACE (une seule fois)
@@ -14,11 +14,18 @@ Sur l'iPhone : ouvrir l'adresse dans Safari › Partager › « Sur l'écran d'a
 UTILISATION
 1. Dans VectisDHG Autonomie : Fichier › Enregistrer, puis envoyer le .json sur l'iPhone (AirDrop, mail, iCloud Drive…).
 2. Dans le Compagnon : onglet Fichier › Ouvrir un fichier .json.
-3. Modifier les post-it (onglet Post-it ou depuis une discipline) : enregistrement automatique sur le téléphone.
-4. Onglet Fichier › Exporter le fichier mis à jour (feuille de partage : AirDrop, mail, Fichiers…).
-5. Dans VectisDHG Autonomie : Fichier › Ouvrir ce fichier.
-ATTENTION : le fichier exporté remplace l'ancien. Ne modifiez pas l'application sur l'ordinateur entre l'envoi et le
-retour du fichier, sinon ces modifications seraient perdues.
+3. Modifier : post-it (onglet Post-it ou depuis une discipline) ; heures ventilées (toucher un service, puis − / + par pas de
+   0,5 h ou saisie directe, le Norvégien se met à jour) ; enseignants (« Ajouter un enseignant », ou « Modifier le nom ou l'ORS »
+   dans la fiche). Les services verrouillés ou de co-enseignement ne se modifient que sur l'ordinateur. La création et la
+   suppression de services, la suppression d'enseignants se font aussi sur l'ordinateur.
+   Enregistrement automatique sur le téléphone.
+4. Onglet Fichier › Exporter les modifications : un petit fichier de modifications est créé (AirDrop, mail, Fichiers/Nuage…).
+5. Dans VectisDHG Autonomie : Fichier › Modifications du téléphone › choisir ce fichier. Chaque modification est vérifiée
+   et comparée à vos données actuelles ; les conflits (valeur changée des deux côtés) sont signalés et décochés par défaut.
+   Cliquer sur « Appliquer ». Les modifications déjà appliquées sont reconnues si le fichier est réimporté.
+6. Dans le Compagnon : « Modifications importées : vider la liste ».
+Le fichier complet (« Exporter le fichier complet ») remplace entièrement l'ancien : à n'utiliser que si rien n'a été modifié
+sur l'ordinateur entre-temps.
 
 AVEC NUAGE (APPS ÉDUCATION) OU UN AUTRE NEXTCLOUD
 L'application ne se connecte pas directement à Nuage : le serveur n'autorise pas l'accès depuis une page web.
@@ -26,8 +33,7 @@ Le fichier .json peut en revanche y être stocké :
 - iPhone : installer l'application Nextcloud et la connecter à Nuage (adresse du serveur + mot de passe d'application créé dans
   Nuage > Paramètres > Sécurité). Les fichiers de Nuage apparaissent dans l'app Fichiers. Dans le Compagnon :
   onglet Fichier > Ouvrir un fichier .json > choisir la sauvegarde dans Nuage.
-- Retour des post-it : onglet Fichier > Exporter le fichier mis à jour > « Enregistrer dans Fichiers » > Nuage, en
-  remplaçant l'ancien fichier.
+- Retour des modifications : onglet Fichier > Exporter les modifications > « Enregistrer dans Fichiers » > Nuage.
 - Ordinateur : client de synchronisation Nextcloud ; avec Chrome ou Edge, Fichier > Ouvrir puis Enregistrer (Ctrl+S) met à jour
   le fichier sur place dans le dossier synchronisé (voir la Notice de VectisDHG Autonomie).
 Évitez de modifier le même fichier sur deux appareils en même temps.

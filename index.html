@@ -83,6 +83,25 @@ table.t tr:last-child td{border-bottom:0}
 .seg button.on{background:var(--card);color:var(--brand);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .toast{position:fixed;left:50%;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 14px);transform:translateX(-50%);background:#0f172a;color:#fff;padding:9px 16px;border-radius:999px;font-size:.85rem;z-index:20;opacity:0;pointer-events:none;transition:opacity .25s}
 .toast.show{opacity:.95}
+input.txt{margin-bottom:12px}
+.lbl{display:block;font-size:.78rem;font-weight:700;color:var(--muted);margin:2px 0 6px;text-transform:uppercase;letter-spacing:.04em}
+.err{color:var(--bad);font-size:.85rem;min-height:1.2em;margin-bottom:8px}
+.sheet{position:fixed;inset:0;z-index:30;display:flex;align-items:flex-end;justify-content:center}
+.sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.45)}
+.sheet-card{position:relative;background:var(--card);width:100%;max-width:720px;max-height:88vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(0,0,0,.25)}
+.sh-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px}
+.sh-head strong{font-size:1.02rem}
+.sumbox{display:flex;gap:10px;margin-bottom:12px}
+.sumbox>div{flex:1;background:var(--bg);border-radius:12px;padding:9px 11px}
+.sumbox span{display:block;font-size:.72rem;color:var(--muted)}
+.sumbox strong{display:block;font-size:1.02rem;margin:1px 0 3px}
+.srow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.srow:last-child{border-bottom:0}
+.sname{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.sval{font-variant-numeric:tabular-nums;font-weight:650}
+.stepper{display:flex;align-items:center;gap:6px}
+.stepper button{width:44px;height:44px;border:0;border-radius:12px;background:var(--brand-soft);color:var(--brand);font-size:1.5rem;font-weight:700;line-height:1}
+.stepper input{width:70px;height:44px;text-align:center;font-size:1.1rem;font-weight:700;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--text);font-variant-numeric:tabular-nums}
 .hidden{display:none!important}
 </style>
 </head>
@@ -91,6 +110,7 @@ table.t tr:last-child td{border-bottom:0}
 <main id="main"></main>
 <nav class="nav" id="nav"></nav>
 <input type="file" id="fileInput" accept=".json,application/json" class="hidden">
+<div class="sheet hidden" id="sheet"><div class="sheet-bg" onclick="closeSheet()"></div><div class="sheet-card" id="sheetCard"></div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -100,7 +120,7 @@ const LS_KEY = 'vectis.compagnon.v1';
 let obj = null;                 // JSON complet de l'application (conservé tel quel, seuls les post-it changent)
 let fileName = '';
 let loadedAt = '';
-let dirty = {};                 // post-it modifiés depuis le chargement { discipline: true }
+let journal = [];               // modifications faites sur le téléphone (rejouées sur l'ordinateur)
 let ui = { tab: 'home', disc: null, teacher: null, discTab: 'services', q: '', tq: '' };
 
 const $ = id => document.getElementById(id);
@@ -120,13 +140,13 @@ function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add
 
 // ───────── Persistance locale (sans serveur) ─────────
 function persist() {
-  try { localStorage.setItem(LS_KEY, JSON.stringify({ obj, fileName, loadedAt, dirty, orig })); }
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ obj, fileName, loadedAt, journal })); }
   catch (e) { /* stockage indisponible : l'app fonctionne en mémoire */ }
 }
 function restore() {
   try {
     const s = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-    if (s && s.obj && s.obj.dataStore) { obj = s.obj; fileName = s.fileName || ''; loadedAt = s.loadedAt || ''; dirty = s.dirty || {}; Object.assign(orig, s.orig || {}); }
+    if (s && s.obj && s.obj.dataStore) { obj = s.obj; fileName = s.fileName || ''; loadedAt = s.loadedAt || ''; journal = Array.isArray(s.journal) ? s.journal : []; }
   } catch (e) {}
 }
 
@@ -148,8 +168,8 @@ function crossListed(disc) {
   const out = [];
   Object.keys(store()).forEach(od => {
     if (od === disc) return;
-    (store()[od].services || []).forEach(s => {
-      if (s.isOptionnel && Array.isArray(s.assignedDisciplines) && s.assignedDisciplines.includes(disc)) out.push(s);
+    (store()[od].services || []).forEach((s, si) => {
+      if (s.isOptionnel && Array.isArray(s.assignedDisciplines) && s.assignedDisciplines.includes(disc)) out.push({ sv: s, od, si });
     });
   });
   return out;
@@ -167,10 +187,10 @@ function pondExtra(sums, t, data) {
 }
 function teacherSummary(disc, t) {
   const data = store()[disc];
-  const services = (data.services || []).concat(crossListed(disc));
+  const services = (data.services || []).map((sv, si) => ({ sv, od: disc, si })).concat(crossListed(disc));
   const sums = {}; sums[t] = 0;
   let raw = 0; const rows = [];
-  services.forEach(sv => {
+  services.forEach(({ sv, od, si }) => {
     const v = num(sv.allocations && sv.allocations[t]);
     if (!(v > 0)) return;
     raw += v;
@@ -180,7 +200,7 @@ function teacherSummary(disc, t) {
       else if (Math.abs(f - 1.1) < 0.01) sums[t] += v * 0.1;
       else { sums['x:' + t] = sums['x:' + t] || {}; sums['x:' + t][f] = (sums['x:' + t][f] || 0) + v; }
     }
-    rows.push({ level: svcLevels(sv).join(', '), name: sv.name || '', hours: v, active: !!sv.ponderationActive, factor: f });
+    rows.push({ level: svcLevels(sv).join(', '), name: sv.name || '', hours: v, active: !!sv.ponderationActive, factor: f, od, si });
   });
   const pond = pondExtra(sums, t, data);
   const apport = (data.apports && data.apports[t] !== undefined) ? num(data.apports[t]) : 18;
@@ -194,11 +214,11 @@ function discSummary(disc) {
   let raw = 0, pond = 0, are = 0, hsa = 0, total = 0;
   (data.teachers || []).forEach(t => { const s = teacherSummary(disc, t); raw += s.raw; pond += s.pond; are += s.are; hsa += s.hsa; total += s.total; });
   const svcs = [];
-  (data.services || []).forEach(sv => {
+  (data.services || []).forEach((sv, si) => {
     const target = num(sv.classes) * num(sv.hours);
     let done = 0; Object.values(sv.allocations || {}).forEach(v => { done += num(v); });
     const diff = Math.round((target - done) * 100) / 100;
-    svcs.push({ sv, target, done, diff, co: !!sv.isCoEnseignement });
+    svcs.push({ sv, si, target, done, diff, co: !!sv.isCoEnseignement });
   });
   const todo = svcs.filter(x => !x.co && x.diff > 0.004).length;
   const over = svcs.filter(x => !x.co && x.diff < -0.004).length;
@@ -220,7 +240,7 @@ function globalStats() {
   return { hp, hsa, dgh, used, remaining: dgh - used, todoH, nTodo, nOver, alerts };
 }
 const noteOf = d => (store()[d] && store()[d].note) || '';
-const nDirty = () => Object.keys(dirty).length;
+const nDirty = () => journal.length;
 
 // ───────── Rendu ─────────
 function go(patch) { Object.assign(ui, patch); render(); window.scrollTo(0, 0); }
@@ -257,7 +277,8 @@ function viewHome() {
   const pct = g.dgh > 0 ? Math.min(100, g.used / g.dgh * 100) : 0, over = g.remaining < -0.004;
   const lab = over ? 'Dépassement' : 'Reste à utiliser';
   const al = g.alerts.slice(0, 8).map(a => `<div class="alert" onclick="go({tab:'disc',disc:${JSON.stringify(a.disc).replace(/"/g, '&quot;')}})"><span class="dot ${a.sev}"></span><div class="main"><div class="t" style="font-weight:650">${esc(a.t)}</div><div class="s" style="font-size:.8rem;color:var(--muted)">${esc(a.disc)} · ${esc(a.m)}</div></div></div>`).join('');
-  return `<div class="card" style="padding:10px 14px"><div style="font-weight:700">${esc(ep.name || '')}</div><div class="s" style="font-size:.8rem;color:var(--muted)">${[ep.uai, ep.commune].filter(Boolean).map(esc).join(' · ')}</div></div>
+  const pend = nDirty() ? `<div class="card" style="background:var(--warn-bg);border-color:var(--warn);cursor:pointer" onclick="go({tab:'file'})"><strong style="color:var(--warn)">✏️ ${nDirty()} modification${nDirty() > 1 ? 's' : ''} à exporter</strong><div class="s" style="font-size:.8rem;color:var(--muted)">Touchez pour les exporter vers l'ordinateur.</div></div>` : '';
+  return pend + `<div class="card" style="padding:10px 14px"><div style="font-weight:700">${esc(ep.name || '')}</div><div class="s" style="font-size:.8rem;color:var(--muted)">${[ep.uai, ep.commune].filter(Boolean).map(esc).join(' · ')}</div></div>
   <div class="kpis">
     <div class="kpi"><span>Dotation (DHG)</span><strong>${fr(g.dgh, 1)} h</strong><small>${fr(g.hp, 1)} HP + ${fr(g.hsa, 1)} HSA</small></div>
     <div class="kpi"><span>Heures ventilées</span><strong>${fr(g.used, 1)} h</strong><small>${pondOn() ? 'pond. et ARE compris' : 'ARE compris'}</small></div>
@@ -278,7 +299,7 @@ function viewDiscList() {
   }).join('')}</div>`;
 }
 function postitBlock(d, withTitle) {
-  const mod = dirty[d];
+  const mod = journal.some(o => o.k === 'note' && o.disc === d);
   return `<div class="postit">${withTitle ? `<h3>📝 ${esc(d)} ${mod ? '<span class="mod">modifié</span>' : ''}</h3>` : (mod ? '<h3><span class="mod">modifié</span></h3>' : '')}
   <textarea data-disc="${esc(d)}" placeholder="Notes libres…" oninput="onNote(this)">${esc(noteOf(d))}</textarea></div>`;
 }
@@ -290,12 +311,12 @@ function viewDiscDetail(d) {
   let body = '';
   if (ui.discTab === 'services') {
     body = `<div class="card">${s.svcs.length ? s.svcs.map(x => {
-      const bd = x.co ? '<span class="badge b-gray">co-enseignement</span>' : (x.diff > 0.004 ? `<span class="badge b-bad">reste ${fh(x.diff, data)}</span>` : (x.diff < -0.004 ? `<span class="badge b-warn">+${fh(-x.diff, data)}</span>` : '<span class="badge b-ok">ventilé</span>'));
+      const bd = x.co ? '<span class="badge b-gray">co-ens.</span>' : (x.diff > 0.004 ? `<span class="badge b-bad">reste ${fh(x.diff, data)}</span>` : (x.diff < -0.004 ? `<span class="badge b-warn">+${fh(-x.diff, data)}</span>` : '<span class="badge b-ok">ventilé</span>'));
       const who = Object.entries(x.sv.allocations || {}).filter(([, v]) => num(v) > 0).map(([t, v]) => `${esc(t)} ${fh(num(v), data)}`).join(' · ');
-      return `<div class="row" style="cursor:default;align-items:flex-start"><div class="main"><div class="t" style="white-space:normal"><span class="chip">${esc(svcLevels(x.sv).join(', '))}</span>${esc(x.sv.name || '(sans intitulé)')}</div><div class="s">${fr(num(x.sv.classes), 1)} cl. × ${fh(num(x.sv.hours), data)} = ${fh(x.target, data)}</div>${who ? `<div class="s">${who}</div>` : ''}</div><div class="r">${bd}</div></div>`;
+      return `<div class="row" style="align-items:flex-start" onclick="openService(${JSON.stringify(d).replace(/"/g, '&quot;')},${x.si})"><div class="main"><div class="t" style="white-space:normal"><span class="chip">${esc(svcLevels(x.sv).join(', '))}</span>${esc(x.sv.name || '(sans intitulé)')}</div><div class="s">${fr(num(x.sv.classes), 1)} cl. × ${fh(num(x.sv.hours), data)} = ${fh(x.target, data)}</div>${who ? `<div class="s">${who}</div>` : ''}</div><div class="r">${bd}</div><span class="chev">›</span></div>`;
     }).join('') : '<div class="empty" style="padding:14px">Aucun service.</div>'}</div>`;
   } else if (ui.discTab === 'teachers') {
-    body = `<div class="card">${(data.teachers || []).length ? data.teachers.map(t => { const m = teacherSummary(d, t); return teacherRow(d, t, m, data); }).join('') : '<div class="empty" style="padding:14px">Aucun enseignant.</div>'}</div>`;
+    body = `<button class="btn sec" onclick="openNewTeacher(${JSON.stringify(d).replace(/"/g, '&quot;')})">＋ Ajouter un enseignant</button><div class="card">${(data.teachers || []).length ? data.teachers.map(t => { const m = teacherSummary(d, t); return teacherRow(d, t, m, data); }).join('') : '<div class="empty" style="padding:14px">Aucun enseignant.</div>'}</div>`;
   } else body = postitBlock(d, false) + '<p class="note">Enregistré automatiquement sur ce téléphone. Pour le retrouver dans VectisDHG Autonomie, exportez le fichier depuis l\'onglet Fichier.</p>';
   return head + seg + body;
 }
@@ -321,12 +342,13 @@ function onTq(v) {
 function viewTeacher(d, t) {
   const data = store()[d]; if (!data) return '';
   const m = teacherSummary(d, t);
-  const rows = m.rows.length ? m.rows.map(r => `<tr><td><span class="chip">${esc(r.level)}</span>${esc(r.name)}</td><td class="n">${fh(r.hours, data)}${r.active ? `<br><small style="color:var(--muted)">× ${String(r.factor).replace('.', ',')}</small>` : ''}</td></tr>`).join('') : '<tr><td colspan="2" style="color:var(--muted)">Aucun service attribué</td></tr>';
+  const rows = m.rows.length ? m.rows.map(r => `<tr onclick="openService(${JSON.stringify(r.od).replace(/"/g, '&quot;')},${r.si})" style="cursor:pointer"><td><span class="chip">${esc(r.level)}</span>${esc(r.name)}</td><td class="n">${fh(r.hours, data)}${r.active ? `<br><small style="color:var(--muted)">× ${String(r.factor).replace('.', ',')}</small>` : ''}</td></tr>`).join('') : '<tr><td colspan="2" style="color:var(--muted)">Aucun service attribué</td></tr>';
   const tot = [['Heures enseignées', fh(m.raw, data)]];
   if (pondOn()) tot.push(['Pondérations', fh(m.pond, data)]);
   m.ares.forEach(a => tot.push([`ARE : ${esc(a.label)}`, fh(a.hours, data)]));
   tot.push(['Total', `<strong>${fh(m.total, data)}</strong>`], ['ORS', fh(m.apport, data)], ['HSA', `<span class="badge ${m.hsa > 0.004 ? 'b-warn' : (m.hsa < -0.004 ? 'b-bad' : 'b-ok')}">${fh(m.hsa, data, true)}</span>`]);
-  return `<div class="card"><h2>Services</h2><table class="t"><tbody>${rows}</tbody></table></div>
+  return `<button class="btn sec" onclick="openTeacherEdit(${JSON.stringify(d).replace(/"/g, '&quot;')},${JSON.stringify(t).replace(/"/g, '&quot;')})">✏️ Modifier le nom ou l'ORS</button>
+  <div class="card"><h2>Services · touchez pour modifier les heures</h2><table class="t"><tbody>${rows}</tbody></table></div>
   <div class="card"><h2>Totaux</h2><table class="t"><tbody>${tot.map(([a, b]) => `<tr><td>${a}</td><td class="n">${b}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function viewNotes() {
@@ -334,37 +356,240 @@ function viewNotes() {
   if (!names.length) return '<div class="empty"><b>📝</b>Aucune discipline.</div>';
   return `<p class="note" style="margin-top:0">Touchez un post-it pour le modifier. Enregistrement automatique sur ce téléphone.</p>` + names.map(d => postitBlock(d, true)).join('');
 }
+function opText(o) {
+  const d = o.disc;
+  if (o.k === 'note') return `📝 Post-it ${d}`;
+  if (o.k === 'alloc') return `⏱️ ${o.teacher} · ${o.svc || 'service'}${o.level ? ' (' + o.level + ')' : ''} : ${fr(o.from)} → ${fr(o.to)} h`;
+  if (o.k === 'tadd') return `➕ ${o.name} (${d}), ORS ${fr(o.ors)} h`;
+  if (o.k === 'trename') return `✏️ ${o.from} → ${o.to} (${d})`;
+  if (o.k === 'tors') return `🎓 ${o.teacher} : ORS ${fr(o.from)} → ${fr(o.to)} h`;
+  return o.k;
+}
 function viewFile() {
   const n = nDirty();
+  const list = n ? `<div class="oplist">${journal.map(o => `<div class="s" style="padding:5px 0;border-bottom:1px solid var(--line);font-size:.85rem">${esc(opText(o))}</div>`).join('')}</div>` : '<p class="note" style="margin:0">Aucune modification en attente.</p>';
   return `<div class="card"><h2>Fichier chargé</h2><div style="font-weight:650;word-break:break-all">${esc(fileName || '—')}</div><div class="s" style="font-size:.8rem;color:var(--muted)">Ouvert le ${esc(loadedAt || '—')}</div></div>
-  <div class="card"><h2>Post-it modifiés : ${n}</h2>
-    <button class="btn" ${n ? '' : 'disabled'} onclick="exportFile()">📤 Exporter le fichier mis à jour</button>
-    <p class="note">Le fichier exporté contient vos données inchangées, avec les post-it à jour. Ouvrez-le ensuite dans VectisDHG Autonomie (Fichier › Ouvrir). Il remplace le fichier précédent : ne modifiez pas l'application sur l'ordinateur entre-temps, ou ces modifications seraient perdues.</p>
-    ${n ? `<button class="btn dng" onclick="resetNotes()">↩︎ Annuler mes modifications de post-it</button>` : ''}</div>
+  <div class="card"><h2>Modifications en attente : ${n}</h2>${list}
+    <div style="height:10px"></div>
+    <button class="btn" ${n ? '' : 'disabled'} onclick="exportDelta()">📤 Exporter les modifications</button>
+    <p class="note">Envoyez ce petit fichier vers l'ordinateur (AirDrop, mail, Nuage…), puis dans VectisDHG Autonomie : <strong>Fichier › Modifications du téléphone</strong>. Vous vérifiez chaque changement avant de l'appliquer ; les conflits éventuels sont signalés.</p>
+    ${n ? `<button class="btn sec" onclick="clearJournal()">✓ Modifications importées : vider la liste</button>
+    <button class="btn dng" onclick="resetAll()">↩︎ Annuler toutes mes modifications</button>` : ''}</div>
+  <div class="card"><h2>Fichier complet</h2><button class="btn sec" ${n ? '' : 'disabled'} onclick="exportFile()">📤 Exporter le fichier complet</button>
+    <p class="note" style="margin-bottom:0">Remplace entièrement l'ancien fichier sur l'ordinateur : à réserver au cas où rien n'a changé là-bas.</p></div>
   <div class="card"><h2>Autre fichier</h2><button class="btn sec" onclick="askOpen()">📂 Ouvrir un autre fichier .json</button>
     <p class="note" style="margin-bottom:0">Les données restent sur ce téléphone, rien n'est envoyé sur Internet. Astuce : dans Safari, « Partager › Sur l'écran d'accueil » installe l'application.</p></div>
-  <div class="card"><h2>Fichier dans Nuage / Nextcloud</h2><p class="note" style="margin:0">Installez l'application Nextcloud et connectez-la à Nuage : vos fichiers apparaissent dans « Ouvrir un fichier ». Pour le retour, exportez le fichier mis à jour puis « Enregistrer dans Fichiers » › Nuage, en remplaçant l'ancien.</p></div>`;
+  <div class="card"><h2>Fichier dans Nuage / Nextcloud</h2><p class="note" style="margin:0">Installez l'application Nextcloud et connectez-la à Nuage : vos fichiers apparaissent dans « Ouvrir un fichier ». Pour le retour, enregistrez le fichier exporté dans Fichiers › Nuage.</p></div>`;
 }
 
-// ───────── Actions ─────────
-const orig = {};  // post-it d'origine (pour annuler)
-function onNote(ta) {
-  const d = ta.dataset.disc, v = ta.value;
+// ───────── Journal des modifications ─────────
+const r2 = v => Math.round(num(v) * 100) / 100;
+// Ajoute une modification ; fusionne avec la précédente de même cible tant qu'aucun ajout/renommage d'enseignant ne s'est intercalé
+function logOp(op, key) {
+  for (let i = journal.length - 1; i >= 0; i--) {
+    const o = journal[i];
+    if ((o.k === 'tadd' || o.k === 'trename') && o.disc === op.disc) break;
+    if (opKey(o) === key) {
+      o.to = op.to;
+      const same = o.k === 'note' ? (o.from || '') === (o.to || '') : Math.abs(num(o.from) - num(o.to)) < 0.001;
+      if (same) journal.splice(i, 1);
+      return;
+    }
+  }
+  journal.push(op);
+}
+function opKey(o) {
+  if (o.k === 'note') return 'note|' + o.disc;
+  if (o.k === 'alloc') return `alloc|${o.disc}|${o.sIndex}|${o.teacher}`;
+  if (o.k === 'tors') return `tors|${o.disc}|${o.teacher}`;
+  return null;
+}
+function save() { clearTimeout(save._t); save._t = setTimeout(() => { persist(); pip(); }, 250); }
+
+function setNote(d, v) {
   const data = store()[d]; if (!data) return;
-  if (!(d in orig)) orig[d] = (data.note === undefined ? null : data.note);
+  const from = data.note || '';
   if (v.trim()) data.note = v; else delete data.note;
-  const changed = (orig[d] || '') !== (data.note || '');
-  if (changed) dirty[d] = true; else delete dirty[d];
-  clearTimeout(onNote._t);
-  onNote._t = setTimeout(() => { persist(); pip(); }, 300);
+  if (from === (data.note || '')) return;
+  logOp({ k: 'note', disc: d, from, to: data.note || '' }, 'note|' + d);
+  save();
+}
+function onNote(ta) { setNote(ta.dataset.disc, ta.value); }
+
+function setAlloc(od, si, teacher, val) {
+  const sv = store()[od] && store()[od].services[si]; if (!sv) return;
+  const from = r2(sv.allocations && sv.allocations[teacher]), to = Math.max(0, r2(val));
+  if (from === to) return;
+  if (!sv.allocations) sv.allocations = {};
+  sv.allocations[teacher] = to;
+  logOp({ k: 'alloc', disc: od, sIndex: si, svc: sv.name || '', level: sv.level || '', teacher, from, to }, `alloc|${od}|${si}|${teacher}`);
+  save();
+}
+function orsOf(d, t) { const a = store()[d].apports; return (a && a[t] !== undefined) ? num(a[t]) : 18; }
+function setOrs(d, t, val) {
+  const data = store()[d]; const from = r2(orsOf(d, t)), to = Math.max(0, r2(val));
+  if (from === to) return;
+  if (!data.apports) data.apports = {};
+  data.apports[t] = to;
+  logOp({ k: 'tors', disc: d, teacher: t, from, to }, `tors|${d}|${t}`);
+  save();
+}
+function addTeacherOp(d, name, ors) {
+  const data = store()[d]; if (!data) return false;
+  if (!Array.isArray(data.teachers)) data.teachers = [];
+  if (!name || data.teachers.includes(name)) return false;
+  data.teachers.push(name);
+  if (!data.apports) data.apports = {};
+  data.apports[name] = r2(ors);
+  journal.push({ k: 'tadd', disc: d, name, ors: r2(ors) });
+  save(); return true;
+}
+// Renommage : mêmes règles que l'application (allocations, ARE, ORS, options, coordonnateurs, co-enseignement)
+function renameCore(disc, oldName, newName) {
+  const data = store()[disc];
+  if (!data || !data.teachers.includes(oldName) || data.teachers.includes(newName)) return false;
+  data.teachers[data.teachers.indexOf(oldName)] = newName;
+  ['ares', 'apports'].forEach(k => { if (data[k] && data[k][oldName] !== undefined) { data[k][newName] = data[k][oldName]; delete data[k][oldName]; } });
+  Object.keys(store()).forEach(d => (store()[d].services || []).forEach(sv => {
+    const concerned = d === disc || (Array.isArray(sv.assignedDisciplines) && sv.assignedDisciplines.includes(disc));
+    if (!concerned) return;
+    if (sv.allocations && Object.prototype.hasOwnProperty.call(sv.allocations, oldName)) { sv.allocations[newName] = sv.allocations[oldName]; delete sv.allocations[oldName]; }
+    if (Array.isArray(sv.assignedTeachers)) sv.assignedTeachers = sv.assignedTeachers.map(t => t === oldName ? newName : t);
+  }));
+  (obj.coordinators || []).forEach(e => {
+    if (!(e.discs || []).includes(disc)) return;
+    if (e.teacher === oldName) e.teacher = newName;
+    (e.coords || []).forEach(c => { if (c.teacher === oldName) c.teacher = newName; });
+  });
+  (obj.coEnseignementGroups || []).forEach(g => (g.members || []).forEach(m => { if (m.disc === disc && m.teacher === oldName) m.teacher = newName; }));
+  return true;
+}
+function renameTeacherOp(d, from, to) {
+  if (!renameCore(d, from, to)) return false;
+  journal.push({ k: 'trename', disc: d, from, to });
+  save(); return true;
+}
+function removeTeacherCore(d, name) {   // uniquement pour annuler un ajout fait sur le téléphone
+  const data = store()[d]; if (!data) return;
+  data.teachers = data.teachers.filter(t => t !== name);
+  if (data.apports) delete data.apports[name];
+  if (data.ares) delete data.ares[name];
+  Object.keys(store()).forEach(k => (store()[k].services || []).forEach(sv => { if (sv.allocations) delete sv.allocations[name]; }));
+}
+function revertOp(o) {
+  const data = store()[o.disc]; if (!data) return;
+  if (o.k === 'note') { if ((o.from || '').trim()) data.note = o.from; else delete data.note; }
+  else if (o.k === 'alloc') { const sv = data.services[o.sIndex]; if (sv && sv.allocations) sv.allocations[o.teacher] = o.from; }
+  else if (o.k === 'tors') { if (!data.apports) data.apports = {}; data.apports[o.teacher] = o.from; }
+  else if (o.k === 'trename') renameCore(o.disc, o.to, o.from);
+  else if (o.k === 'tadd') removeTeacherCore(o.disc, o.name);
+}
+function resetAll() {
+  if (!confirm('Annuler toutes les modifications faites sur ce téléphone depuis le chargement du fichier ?')) return;
+  for (let i = journal.length - 1; i >= 0; i--) revertOp(journal[i]);
+  journal = []; persist(); render(); toast('Modifications annulées');
+}
+function clearJournal() {
+  if (!confirm("Vider la liste ? À faire seulement une fois les modifications importées dans VectisDHG Autonomie. Les données actuelles du téléphone sont conservées comme nouveau point de départ.")) return;
+  journal = []; persist(); render(); toast('Liste vidée');
 }
 function pip() {
   const b = $('nav').lastElementChild; if (!b) return;
   let p = b.querySelector('.pip');
   if (nDirty()) { if (!p) { p = document.createElement('span'); p.className = 'pip'; b.appendChild(p); } p.textContent = nDirty(); } else if (p) p.remove();
 }
+
+// ───────── Feuilles de saisie ─────────
+let sheet = null;
+const jq = v => JSON.stringify(v).replace(/"/g, '&quot;');
+const parseH = v => { const x = parseFloat(String(v).replace(',', '.')); return isNaN(x) ? 0 : x; };
+function openSheet(html) { $('sheetCard').innerHTML = html; $('sheet').classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+function closeSheet() { $('sheet').classList.add('hidden'); document.body.style.overflow = ''; sheet = null; render(); }
+
+function openService(od, si) {
+  const sv = store()[od] && store()[od].services[si]; if (!sv) return;
+  const names = [];
+  const add = t => { if (!names.includes(t)) names.push(t); };
+  (store()[od].teachers || []).forEach(add);
+  if (sv.isOptionnel && Array.isArray(sv.assignedDisciplines)) sv.assignedDisciplines.forEach(d => ((store()[d] && store()[d].teachers) || []).forEach(add));
+  Object.keys(sv.allocations || {}).forEach(t => { if (num(sv.allocations[t]) > 0) add(t); });
+  sheet = { type: 'svc', od, si, names };
+  renderServiceSheet();
+}
+function renderServiceSheet() {
+  const { od, si, names } = sheet, sv = store()[od].services[si], data = store()[od];
+  const ro = sv.locked ? '🔒 Ce service est verrouillé sur l\'ordinateur : modification impossible ici.' : (sv.isCoEnseignement ? 'Service de co-enseignement : à modifier sur l\'ordinateur.' : '');
+  const rows = names.map((t, i) => {
+    const v = num(sv.allocations && sv.allocations[t]);
+    return `<div class="srow"><div class="sname">${esc(t)}</div>${ro
+      ? `<div class="sval">${fh(v, data)}</div>`
+      : `<div class="stepper"><button type="button" onclick="stepAlloc(${i},-0.5)" aria-label="Moins">−</button><input id="al${i}" type="text" inputmode="decimal" value="${fr(v)}" onchange="setAllocInput(${i}, this.value)" onfocus="this.select()"><button type="button" onclick="stepAlloc(${i},0.5)" aria-label="Plus">+</button></div>`}</div>`;
+  }).join('');
+  openSheet(`<div class="sh-head"><div><span class="chip">${esc(svcLevels(sv).join(', '))}</span><strong>${esc(sv.name || '(sans intitulé)')}</strong><div class="s" style="font-size:.8rem;color:var(--muted)">${esc(od)} · ${fr(num(sv.classes), 1)} cl. × ${fh(num(sv.hours), data)}</div></div><button class="back" onclick="closeSheet()">Fermer</button></div>
+    <div id="svcSummary" class="sumbox"></div>
+    ${ro ? `<p class="note" style="margin-top:0">${ro}</p>` : ''}
+    <div>${rows || '<div class="empty" style="padding:14px">Aucun enseignant dans cette discipline.</div>'}</div>`);
+  updateSheetSummary();
+}
+function stepAlloc(i, delta) {
+  const { od, si, names } = sheet, sv = store()[od].services[si];
+  const cur = num(sv.allocations && sv.allocations[names[i]]);
+  setAlloc(od, si, names[i], Math.max(0, cur + delta));
+  $('al' + i).value = fr(num(sv.allocations[names[i]]));
+  updateSheetSummary();
+}
+function setAllocInput(i, v) {
+  const { od, si, names } = sheet, sv = store()[od].services[si];
+  setAlloc(od, si, names[i], parseH(v));
+  $('al' + i).value = fr(num(sv.allocations && sv.allocations[names[i]]));
+  updateSheetSummary();
+}
+function updateSheetSummary() {
+  const el = $('svcSummary'); if (!el || !sheet || sheet.type !== 'svc') return;
+  const { od, si } = sheet, sv = store()[od].services[si], data = store()[od];
+  const target = num(sv.classes) * num(sv.hours); let done = 0;
+  Object.values(sv.allocations || {}).forEach(v => { done += num(v); });
+  const diff = Math.round((target - done) * 100) / 100;
+  const g = globalStats(), nv = g.remaining, over = nv < -0.004;
+  const bd = diff > 0.004 ? `<span class="badge b-bad">reste ${fh(diff, data)}</span>` : (diff < -0.004 ? `<span class="badge b-warn">+${fh(-diff, data)}</span>` : '<span class="badge b-ok">ventilé</span>');
+  el.innerHTML = `<div><span>Ventilé / besoin</span><strong>${fh(done, data)} / ${fh(target, data)}</strong>${bd}</div><div><span>Norvégien</span><strong style="color:var(${over ? '--bad' : '--ok'})">${nv > 0.004 ? '+' : ''}${fh(nv, data)}</strong></div>`;
+}
+function openTeacherEdit(d, t) {
+  sheet = { type: 'tedit', d, t };
+  openSheet(`<div class="sh-head"><strong>Modifier l'enseignant</strong><button class="back" onclick="closeSheet()">Fermer</button></div>
+    <label class="lbl">Nom et prénom</label><input id="tname" class="txt" value="${esc(t)}" autocapitalize="characters" autocomplete="off">
+    <label class="lbl">ORS (heures par semaine)</label><input id="tors" class="txt" type="text" inputmode="decimal" value="${fr(orsOf(d, t))}">
+    <div id="terr" class="err"></div>
+    <button class="btn" onclick="saveTeacherEdit()">Enregistrer</button>`);
+}
+function saveTeacherEdit() {
+  const { d, t } = sheet, name = $('tname').value.trim(), ors = parseH($('tors').value);
+  if (!name) { $('terr').textContent = 'Le nom est obligatoire.'; return; }
+  if (name !== t && store()[d].teachers.includes(name)) { $('terr').textContent = 'Un enseignant porte déjà ce nom dans cette discipline.'; return; }
+  let cur = t;
+  if (name !== t && renameTeacherOp(d, t, name)) cur = name;
+  setOrs(d, cur, ors);
+  if (ui.teacher && ui.teacher.t === t && ui.teacher.d === d) ui.teacher = { d, t: cur };
+  closeSheet(); toast('Enregistré');
+}
+function openNewTeacher(d) {
+  sheet = { type: 'tnew', d };
+  openSheet(`<div class="sh-head"><strong>Nouvel enseignant · ${esc(d)}</strong><button class="back" onclick="closeSheet()">Fermer</button></div>
+    <label class="lbl">Nom et prénom</label><input id="tname" class="txt" placeholder="DUPONT Marie" autocapitalize="characters" autocomplete="off">
+    <label class="lbl">ORS (heures par semaine)</label><input id="tors" class="txt" type="text" inputmode="decimal" value="18">
+    <div id="terr" class="err"></div>
+    <button class="btn" onclick="saveNewTeacher()">Ajouter</button>`);
+}
+function saveNewTeacher() {
+  const { d } = sheet, name = $('tname').value.trim(), ors = parseH($('tors').value);
+  if (!name) { $('terr').textContent = 'Le nom est obligatoire.'; return; }
+  if (!addTeacherOp(d, name, ors)) { $('terr').textContent = 'Un enseignant porte déjà ce nom dans cette discipline.'; return; }
+  closeSheet(); toast('Enseignant ajouté');
+}
+
+// ───────── Fichiers ─────────
 function askOpen() {
-  if (nDirty() && !confirm('Des post-it modifiés n\'ont pas été exportés. Ouvrir un autre fichier les effacera. Continuer ?')) return;
+  if (nDirty() && !confirm('Des modifications n\'ont pas été exportées. Ouvrir un autre fichier les effacera. Continuer ?')) return;
   $('fileInput').click();
 }
 $('fileInput').addEventListener('change', e => {
@@ -374,7 +599,7 @@ $('fileInput').addEventListener('change', e => {
     try {
       const o = JSON.parse(r.result);
       if (!o || typeof o !== 'object' || !o.dataStore) throw new Error('format');
-      obj = o; fileName = f.name; dirty = {}; for (const k in orig) delete orig[k];
+      obj = o; fileName = f.name; journal = [];
       loadedAt = new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
       ui = { tab: 'home', disc: null, teacher: null, discTab: 'services', q: '', tq: '' };
       persist(); render(); toast('Fichier chargé');
@@ -382,14 +607,7 @@ $('fileInput').addEventListener('change', e => {
   };
   r.readAsText(f); e.target.value = '';
 });
-function resetNotes() {
-  if (!confirm('Revenir aux post-it du fichier d\'origine ?')) return;
-  Object.keys(dirty).forEach(d => { const data = store()[d]; if (!data) return; if (orig[d] === null || orig[d] === undefined) delete data.note; else data.note = orig[d]; });
-  dirty = {}; for (const k in orig) delete orig[k]; persist(); render(); toast('Modifications annulées');
-}
-async function exportFile() {
-  const text = JSON.stringify(obj, null, 2);
-  const name = fileName || 'DHG.json';
+async function shareText(text, name) {
   const file = new File([text], name, { type: 'application/json' });
   try {
     if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; }
@@ -397,6 +615,14 @@ async function exportFile() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function exportFile() { return shareText(JSON.stringify(obj, null, 2), fileName || 'DHG.json'); }
+function exportDelta() {
+  if (!journal.length) return;
+  const ep = (obj.epleIdentity || {});
+  const now = new Date(), p = n => String(n).padStart(2, '0');
+  const payload = { format: 'vectis-modifications', version: 1, createdAt: now.toISOString(), source: 'VectisDHG Compagnon', sourceFile: fileName, eple: { name: ep.name || '', uai: ep.uai || '' }, ops: journal };
+  return shareText(JSON.stringify(payload, null, 2), `Modifications_Compagnon_${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}_${p(now.getHours())}h${p(now.getMinutes())}.json`);
 }
 
 // ───────── Démarrage ─────────
