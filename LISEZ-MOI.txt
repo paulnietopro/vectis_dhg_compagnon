@@ -19,3 +19,15 @@ UTILISATION
 5. Dans VectisDHG Autonomie : Fichier › Ouvrir ce fichier.
 ATTENTION : le fichier exporté remplace l'ancien. Ne modifiez pas l'application sur l'ordinateur entre l'envoi et le
 retour du fichier, sinon ces modifications seraient perdues.
+
+AVEC NUAGE (APPS ÉDUCATION) OU UN AUTRE NEXTCLOUD
+L'application ne se connecte pas directement à Nuage : le serveur n'autorise pas l'accès depuis une page web.
+Le fichier .json peut en revanche y être stocké :
+- iPhone : installer l'application Nextcloud et la connecter à Nuage (adresse du serveur + mot de passe d'application créé dans
+  Nuage > Paramètres > Sécurité). Les fichiers de Nuage apparaissent dans l'app Fichiers. Dans le Compagnon :
+  onglet Fichier > Ouvrir un fichier .json > choisir la sauvegarde dans Nuage.
+- Retour des post-it : onglet Fichier > Exporter le fichier mis à jour > « Enregistrer dans Fichiers » > Nuage, en
+  remplaçant l'ancien fichier.
+- Ordinateur : client de synchronisation Nextcloud ; avec Chrome ou Edge, Fichier > Ouvrir puis Enregistrer (Ctrl+S) met à jour
+  le fichier sur place dans le dossier synchronisé (voir la Notice de VectisDHG Autonomie).
+Évitez de modifier le même fichier sur deux appareils en même temps.

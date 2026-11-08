@@ -342,7 +342,8 @@ function viewFile() {
     <p class="note">Le fichier exporté contient vos données inchangées, avec les post-it à jour. Ouvrez-le ensuite dans VectisDHG Autonomie (Fichier › Ouvrir). Il remplace le fichier précédent : ne modifiez pas l'application sur l'ordinateur entre-temps, ou ces modifications seraient perdues.</p>
     ${n ? `<button class="btn dng" onclick="resetNotes()">↩︎ Annuler mes modifications de post-it</button>` : ''}</div>
   <div class="card"><h2>Autre fichier</h2><button class="btn sec" onclick="askOpen()">📂 Ouvrir un autre fichier .json</button>
-    <p class="note" style="margin-bottom:0">Les données restent sur ce téléphone, rien n'est envoyé sur Internet. Astuce : dans Safari, « Partager › Sur l'écran d'accueil » installe l'application.</p></div>`;
+    <p class="note" style="margin-bottom:0">Les données restent sur ce téléphone, rien n'est envoyé sur Internet. Astuce : dans Safari, « Partager › Sur l'écran d'accueil » installe l'application.</p></div>
+  <div class="card"><h2>Fichier dans Nuage / Nextcloud</h2><p class="note" style="margin:0">Installez l'application Nextcloud et connectez-la à Nuage : vos fichiers apparaissent dans « Ouvrir un fichier ». Pour le retour, exportez le fichier mis à jour puis « Enregistrer dans Fichiers » › Nuage, en remplaçant l'ancien.</p></div>`;
 }
 
 // ───────── Actions ─────────
