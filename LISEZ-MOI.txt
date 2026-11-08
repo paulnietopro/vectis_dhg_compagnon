@@ -1,0 +1,21 @@
+VectisDHG Compagnon (iPhone) — consultation + post-it
+
+CE QUE FAIT L'APPLICATION
+- Consulter : dotation, heures ventilées, reste à utiliser, services à ventiler, disciplines, enseignants.
+- Modifier uniquement les post-it des disciplines.
+- Tout reste sur le téléphone : aucune donnée n'est envoyée sur Internet.
+
+MISE EN PLACE (une seule fois)
+Une application web installable doit être servie en https. Déposez le dossier tel quel sur un hébergement statique
+gratuit de votre choix (GitHub Pages, Netlify, serveur de l'établissement…). Aucune donnée n'y est stockée :
+seuls les fichiers de l'application y sont déposés.
+Sur l'iPhone : ouvrir l'adresse dans Safari › Partager › « Sur l'écran d'accueil ». Elle fonctionne ensuite hors connexion.
+
+UTILISATION
+1. Dans VectisDHG Autonomie : Fichier › Enregistrer, puis envoyer le .json sur l'iPhone (AirDrop, mail, iCloud Drive…).
+2. Dans le Compagnon : onglet Fichier › Ouvrir un fichier .json.
+3. Modifier les post-it (onglet Post-it ou depuis une discipline) : enregistrement automatique sur le téléphone.
+4. Onglet Fichier › Exporter le fichier mis à jour (feuille de partage : AirDrop, mail, Fichiers…).
+5. Dans VectisDHG Autonomie : Fichier › Ouvrir ce fichier.
+ATTENTION : le fichier exporté remplace l'ancien. Ne modifiez pas l'application sur l'ordinateur entre l'envoi et le
+retour du fichier, sinon ces modifications seraient perdues.

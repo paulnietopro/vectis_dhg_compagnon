@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="VectisDHG">
+<meta name="theme-color" content="#1d4ed8">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>VectisDHG Compagnon</title>
+<style>
+:root{
+  --bg:#f1f5f9; --card:#fff; --text:#0f172a; --muted:#64748b; --line:#e2e8f0;
+  --brand:#1d4ed8; --brand-soft:#e8eefc; --ok:#15803d; --ok-bg:#dcfce7; --bad:#b91c1c; --bad-bg:#fee2e2; --warn:#b45309; --warn-bg:#fef3c7;
+  --postit:#fff3a3; --postit-line:#e0c200; --nav-h:58px;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0b1220; --card:#162033; --text:#e5eaf3; --muted:#93a1b8; --line:#26334a; --brand:#7aa2ff; --brand-soft:#1d2a4a;
+    --ok:#4ade80; --ok-bg:#12351f; --bad:#fca5a5; --bad-bg:#3b1618; --warn:#fbbf24; --warn-bg:#3a2a0b; --postit:#4a4210; --postit-line:#a08a00; }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+body{padding-top:env(safe-area-inset-top);padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 12px)}
+header.top{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;align-items:center;gap:10px;min-height:52px}
+header.top h1{font-size:1.05rem;margin:0;flex:1;line-height:1.2}
+header.top small{display:block;font-weight:500;color:var(--muted);font-size:.74rem}
+.back{border:0;background:var(--brand-soft);color:var(--brand);font-size:1rem;border-radius:10px;padding:8px 12px;font-weight:700}
+main{padding:12px 16px;max-width:720px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.card h2{font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 8px}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+.kpi span{display:block;font-size:.74rem;color:var(--muted)}
+.kpi strong{font-size:1.45rem;display:block;margin-top:2px}
+.kpi small{color:var(--muted);font-size:.74rem}
+.kpi.wide{grid-column:1/-1}
+.bar{height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--brand);border-radius:6px}
+.bar i.over{background:var(--bad)}
+.row{display:flex;align-items:center;gap:10px;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+.row:last-child{border-bottom:0}
+.row .main{flex:1;min-width:0}
+.row .t{font-weight:650;overflow:hidden;text-overflow:ellipsis}
+.row .s{font-size:.8rem;color:var(--muted)}
+.row .r{text-align:right;font-variant-numeric:tabular-nums;font-weight:650}
+.chev{color:var(--muted)}
+.badge{display:inline-block;border-radius:999px;padding:2px 9px;font-size:.78rem;font-weight:700}
+.b-ok{background:var(--ok-bg);color:var(--ok)} .b-bad{background:var(--bad-bg);color:var(--bad)} .b-warn{background:var(--warn-bg);color:var(--warn)} .b-gray{background:var(--line);color:var(--muted)}
+.chip{display:inline-block;background:var(--brand-soft);color:var(--brand);border-radius:8px;padding:1px 8px;font-size:.75rem;font-weight:700;margin-right:6px}
+.alert{display:flex;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);align-items:flex-start;cursor:pointer}
+.alert:last-child{border-bottom:0}
+.dot{width:10px;height:10px;border-radius:50%;margin-top:6px;flex:none}
+.dot.bad{background:var(--bad)} .dot.warn{background:var(--warn)}
+input[type=search],input.txt{width:100%;font-size:1rem;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--text);margin-bottom:10px}
+.postit{background:var(--postit);border:1px solid var(--postit-line);border-radius:6px 6px 14px 6px;padding:10px 12px;margin-bottom:12px;box-shadow:0 3px 8px rgba(0,0,0,.12);color:#3b3300}
+@media (prefers-color-scheme: dark){.postit{color:#f4e9a0}}
+.postit h3{margin:0 0 6px;font-size:.9rem;display:flex;gap:8px;align-items:center}
+.postit h3 .mod{font-size:.7rem;background:#f97316;color:#fff;border-radius:999px;padding:1px 8px}
+.postit textarea{width:100%;min-height:96px;border:0;background:transparent;font:inherit;font-size:1rem;color:inherit;resize:vertical;outline:none}
+.postit .ph{font-size:.75rem;opacity:.7}
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+.nav button{flex:1;border:0;background:none;color:var(--muted);padding:7px 2px 6px;font-size:.68rem;display:flex;flex-direction:column;align-items:center;gap:1px;min-height:var(--nav-h);position:relative}
+.nav button b{font-size:1.25rem;line-height:1.2}
+.nav button.on{color:var(--brand);font-weight:700}
+.nav .pip{position:absolute;top:6px;right:calc(50% - 22px);background:#f97316;color:#fff;border-radius:999px;font-size:.62rem;padding:0 6px;font-weight:700}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:13px;font-size:1rem;font-weight:700;background:var(--brand);color:#fff;margin-bottom:10px}
+.btn.sec{background:var(--brand-soft);color:var(--brand)}
+.btn.dng{background:var(--bad-bg);color:var(--bad)}
+.btn:disabled{opacity:.45}
+.note{font-size:.82rem;color:var(--muted);margin:6px 0 12px}
+.empty{text-align:center;color:var(--muted);padding:28px 10px}
+.empty b{display:block;font-size:2.4rem;margin-bottom:6px}
+table.t{width:100%;border-collapse:collapse;font-size:.88rem}
+table.t td,table.t th{padding:7px 4px;border-bottom:1px solid var(--line);text-align:left}
+table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+table.t tr:last-child td{border-bottom:0}
+.seg{display:flex;background:var(--line);border-radius:10px;padding:3px;margin-bottom:12px}
+.seg button{flex:1;border:0;background:none;border-radius:8px;padding:8px;font-size:.88rem;color:var(--muted);font-weight:600}
+.seg button.on{background:var(--card);color:var(--brand);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.toast{position:fixed;left:50%;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 14px);transform:translateX(-50%);background:#0f172a;color:#fff;padding:9px 16px;border-radius:999px;font-size:.85rem;z-index:20;opacity:0;pointer-events:none;transition:opacity .25s}
+.toast.show{opacity:.95}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<header class="top" id="top"></header>
+<main id="main"></main>
+<nav class="nav" id="nav"></nav>
+<input type="file" id="fileInput" accept=".json,application/json" class="hidden">
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+// ───────── État ─────────
+const LS_KEY = 'vectis.compagnon.v1';
+let obj = null;                 // JSON complet de l'application (conservé tel quel, seuls les post-it changent)
+let fileName = '';
+let loadedAt = '';
+let dirty = {};                 // post-it modifiés depuis le chargement { discipline: true }
+let ui = { tab: 'home', disc: null, teacher: null, discTab: 'services', q: '', tq: '' };
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => parseFloat(v) || 0;
+const fr = (v, d = 2) => (Math.round(v * Math.pow(10, d)) / Math.pow(10, d)).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: d });
+function fh(v, data, signed) {
+  v = v || 0;
+  if (data && data.hoursFormat === 'sexa') {
+    const tm = Math.round(Math.abs(v) * 60), h = Math.floor(tm / 60), m = tm % 60;
+    const sg = (v < 0 && tm > 0) ? '-' : ((signed && tm > 0) ? '+' : '');
+    return `${sg}${h}h${String(m).padStart(2, '0')}`;
+  }
+  return `${signed && v > 0 ? '+' : ''}${fr(v)} h`;
+}
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2200); }
+
+// ───────── Persistance locale (sans serveur) ─────────
+function persist() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ obj, fileName, loadedAt, dirty, orig })); }
+  catch (e) { /* stockage indisponible : l'app fonctionne en mémoire */ }
+}
+function restore() {
+  try {
+    const s = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+    if (s && s.obj && s.obj.dataStore) { obj = s.obj; fileName = s.fileName || ''; loadedAt = s.loadedAt || ''; dirty = s.dirty || {}; Object.assign(orig, s.orig || {}); }
+  } catch (e) {}
+}
+
+// ───────── Calculs (reprise de ceux de l'application) ─────────
+const store = () => (obj && obj.dataStore) || {};
+const levelsList = () => (obj && Array.isArray(obj.levels)) ? obj.levels : [];
+const pondOn = () => {
+  const id = obj && obj.epleIdentity;
+  if (!id) return false;
+  if (id.enablePonderations !== undefined) return !!id.enablePonderations;
+  return Object.values(store()).some(d => d && Array.isArray(d.services) && d.services.some(s => s.ponderationActive));
+};
+function svcLevels(s) {
+  if (!s.isOptionnel && s.level) return [s.level];
+  if (Array.isArray(s.levels) && s.levels.length) return s.levels;
+  return s.level ? [s.level] : ['Non défini'];
+}
+function crossListed(disc) {
+  const out = [];
+  Object.keys(store()).forEach(od => {
+    if (od === disc) return;
+    (store()[od].services || []).forEach(s => {
+      if (s.isOptionnel && Array.isArray(s.assignedDisciplines) && s.assignedDisciplines.includes(disc)) out.push(s);
+    });
+  });
+  return out;
+}
+function pondExtra(sums, t, data) {
+  if (!pondOn()) return 0;
+  const ors = (data.apports && data.apports[t] !== undefined) ? num(data.apports[t]) : 18;
+  const h11 = Math.min((sums[t] || 0) / 0.1, 10);
+  let weighted = Math.max(h11, 0), pond = Math.max(h11, 0) * 0.1;
+  const h125 = sums['125:' + t] || 0; weighted += h125; pond += h125 * 0.25;
+  const others = sums['x:' + t] || {};
+  Object.keys(others).forEach(k => { weighted += others[k]; pond += others[k] * (parseFloat(k) - 1); });
+  if (weighted > ors && weighted > 0) pond = pond * Math.max(ors, 0) / weighted;
+  return pond;
+}
+function teacherSummary(disc, t) {
+  const data = store()[disc];
+  const services = (data.services || []).concat(crossListed(disc));
+  const sums = {}; sums[t] = 0;
+  let raw = 0; const rows = [];
+  services.forEach(sv => {
+    const v = num(sv.allocations && sv.allocations[t]);
+    if (!(v > 0)) return;
+    raw += v;
+    const f = sv.ponderationActive ? (num(sv.ponderationFactor) || 1.1) : 1;
+    if (sv.ponderationActive) {
+      if (Math.abs(f - 1.25) < 0.01) sums['125:' + t] = (sums['125:' + t] || 0) + v;
+      else if (Math.abs(f - 1.1) < 0.01) sums[t] += v * 0.1;
+      else { sums['x:' + t] = sums['x:' + t] || {}; sums['x:' + t][f] = (sums['x:' + t][f] || 0) + v; }
+    }
+    rows.push({ level: svcLevels(sv).join(', '), name: sv.name || '', hours: v, active: !!sv.ponderationActive, factor: f });
+  });
+  const pond = pondExtra(sums, t, data);
+  const apport = (data.apports && data.apports[t] !== undefined) ? num(data.apports[t]) : 18;
+  const ares = ((data.ares && Array.isArray(data.ares[t])) ? data.ares[t] : []).map(a => ({ label: a.label || a.short || 'ARE', hours: num(a.hours) }));
+  const are = ares.reduce((x, a) => x + a.hours, 0);
+  const total = raw + pond + are;
+  return { rows, raw, pond, are, ares, total, apport, hsa: total - apport };
+}
+function discSummary(disc) {
+  const data = store()[disc];
+  let raw = 0, pond = 0, are = 0, hsa = 0, total = 0;
+  (data.teachers || []).forEach(t => { const s = teacherSummary(disc, t); raw += s.raw; pond += s.pond; are += s.are; hsa += s.hsa; total += s.total; });
+  const svcs = [];
+  (data.services || []).forEach(sv => {
+    const target = num(sv.classes) * num(sv.hours);
+    let done = 0; Object.values(sv.allocations || {}).forEach(v => { done += num(v); });
+    const diff = Math.round((target - done) * 100) / 100;
+    svcs.push({ sv, target, done, diff, co: !!sv.isCoEnseignement });
+  });
+  const todo = svcs.filter(x => !x.co && x.diff > 0.004).length;
+  const over = svcs.filter(x => !x.co && x.diff < -0.004).length;
+  return { raw, pond, are, hsa, total, svcs, todo, over };
+}
+function globalStats() {
+  const hp = num(obj.dotation && obj.dotation.hp), hsa = num(obj.dotation && obj.dotation.hsa), dgh = hp + hsa;
+  let used = 0, todoH = 0, nTodo = 0, nOver = 0; const alerts = [];
+  Object.keys(store()).forEach(d => {
+    const s = discSummary(d); used += s.total;
+    s.svcs.forEach(x => {
+      if (x.co) return;
+      const lab = `${x.sv.name || '(sans intitulé)'}${x.sv.level ? ' (' + x.sv.level + ')' : ''}`;
+      if (x.target > 0 && x.done === 0) { alerts.push({ sev: 'bad', disc: d, t: lab, m: `Aucune heure ventilée : ${fr(x.target)} h à attribuer` }); nTodo++; todoH += x.target; }
+      else if (x.diff > 0.004) { alerts.push({ sev: 'bad', disc: d, t: lab, m: `Reste ${fr(x.diff)} h à ventiler` }); nTodo++; todoH += x.diff; }
+      else if (x.diff < -0.004) { alerts.push({ sev: 'warn', disc: d, t: lab, m: `Sur-ventilé de ${fr(-x.diff)} h` }); nOver++; }
+    });
+  });
+  return { hp, hsa, dgh, used, remaining: dgh - used, todoH, nTodo, nOver, alerts };
+}
+const noteOf = d => (store()[d] && store()[d].note) || '';
+const nDirty = () => Object.keys(dirty).length;
+
+// ───────── Rendu ─────────
+function go(patch) { Object.assign(ui, patch); render(); window.scrollTo(0, 0); }
+function render() {
+  const nav = $('nav');
+  const tabs = [['home', '🏠', 'Accueil'], ['disc', '📚', 'Disciplines'], ['teach', '👤', 'Enseignants'], ['notes', '📝', 'Post-it'], ['file', '📂', 'Fichier']];
+  nav.innerHTML = tabs.map(([k, ic, lb]) => `<button class="${ui.tab === k ? 'on' : ''}" onclick="go({tab:'${k}',disc:null,teacher:null})"><b>${ic}</b>${lb}${k === 'file' && nDirty() ? `<span class="pip">${nDirty()}</span>` : ''}</button>`).join('');
+  const top = $('top'), main = $('main');
+  if (!obj) { top.innerHTML = '<h1>VectisDHG Compagnon</h1>'; main.innerHTML = viewWelcome(); return; }
+  const ep = (obj.epleIdentity && obj.epleIdentity.name) || 'Établissement';
+  let title = ep, sub = 'VectisDHG Compagnon', back = '';
+  let html = '';
+  if (ui.tab === 'home') html = viewHome();
+  else if (ui.tab === 'disc') {
+    if (ui.disc) { title = ui.disc; sub = ep; back = `<button class="back" onclick="go({disc:null})">‹</button>`; html = viewDiscDetail(ui.disc); }
+    else { title = 'Disciplines'; html = viewDiscList(); }
+  } else if (ui.tab === 'teach') {
+    if (ui.teacher) { title = ui.teacher.t; sub = ui.teacher.d; back = `<button class="back" onclick="go({teacher:null})">‹</button>`; html = viewTeacher(ui.teacher.d, ui.teacher.t); }
+    else { title = 'Enseignants'; html = viewTeachList(); }
+  } else if (ui.tab === 'notes') { title = 'Post-it'; html = viewNotes(); }
+  else if (ui.tab === 'file') { title = 'Fichier'; html = viewFile(); }
+  top.innerHTML = `${back}<h1>${esc(title)}<small>${esc(sub)}</small></h1>`;
+  const keep = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.keep;
+  main.innerHTML = html;
+}
+function viewWelcome() {
+  return `<div class="empty"><b>📱</b><h2 style="margin:0 0 6px;color:var(--text)">Bienvenue</h2>
+  Ouvrez une sauvegarde (.json) enregistrée depuis VectisDHG Autonomie pour la consulter et modifier vos post-it.</div>
+  <button class="btn" onclick="$('fileInput').click()">📂 Ouvrir un fichier .json</button>
+  <p class="note">Le fichier reste sur votre téléphone : rien n'est envoyé sur Internet.</p>`;
+}
+function viewHome() {
+  const g = globalStats(), ep = obj.epleIdentity || {};
+  const pct = g.dgh > 0 ? Math.min(100, g.used / g.dgh * 100) : 0, over = g.remaining < -0.004;
+  const lab = over ? 'Dépassement' : 'Reste à utiliser';
+  const al = g.alerts.slice(0, 8).map(a => `<div class="alert" onclick="go({tab:'disc',disc:${JSON.stringify(a.disc).replace(/"/g, '&quot;')}})"><span class="dot ${a.sev}"></span><div class="main"><div class="t" style="font-weight:650">${esc(a.t)}</div><div class="s" style="font-size:.8rem;color:var(--muted)">${esc(a.disc)} · ${esc(a.m)}</div></div></div>`).join('');
+  return `<div class="card" style="padding:10px 14px"><div style="font-weight:700">${esc(ep.name || '')}</div><div class="s" style="font-size:.8rem;color:var(--muted)">${[ep.uai, ep.commune].filter(Boolean).map(esc).join(' · ')}</div></div>
+  <div class="kpis">
+    <div class="kpi"><span>Dotation (DHG)</span><strong>${fr(g.dgh, 1)} h</strong><small>${fr(g.hp, 1)} HP + ${fr(g.hsa, 1)} HSA</small></div>
+    <div class="kpi"><span>Heures ventilées</span><strong>${fr(g.used, 1)} h</strong><small>${pondOn() ? 'pond. et ARE compris' : 'ARE compris'}</small></div>
+    <div class="kpi wide"><span>${lab}</span><strong style="color:var(${over ? '--bad' : '--ok'})">${over ? '+' : ''}${fr(Math.abs(g.remaining), 2)} h</strong>
+      <div class="bar"><i class="${over ? 'over' : ''}" style="width:${pct}%"></i></div><small>${fr(g.dgh > 0 ? g.used / g.dgh * 100 : 0, 1)} % de la dotation utilisée</small></div>
+  </div>
+  <div class="card"><h2>À surveiller · ${g.nTodo} service${g.nTodo > 1 ? 's' : ''} à ventiler${g.nOver ? ` · ${g.nOver} sur-ventilé${g.nOver > 1 ? 's' : ''}` : ''}</h2>
+    ${al || '<div class="empty" style="padding:12px">✅ Tous les services sont ventilés.</div>'}
+    ${g.alerts.length > 8 ? `<div class="note">… et ${g.alerts.length - 8} autres (voir chaque discipline).</div>` : ''}</div>`;
+}
+function viewDiscList() {
+  const names = Object.keys(store());
+  if (!names.length) return '<div class="empty"><b>📚</b>Aucune discipline.</div>';
+  return `<div class="card">${names.map(d => {
+    const s = discSummary(d), data = store()[d];
+    const bd = s.todo ? `<span class="badge b-bad">${s.todo} à ventiler</span>` : (s.over ? `<span class="badge b-warn">${s.over} sur-ventilé</span>` : `<span class="badge b-ok">OK</span>`);
+    return `<div class="row" onclick="go({disc:${JSON.stringify(d).replace(/"/g, '&quot;')},discTab:'services'})"><div class="main"><div class="t">${esc(d)} ${noteOf(d).trim() ? '📝' : ''}</div><div class="s">${(data.teachers || []).length} enseignant${(data.teachers || []).length > 1 ? 's' : ''} · HSA ${fh(s.hsa, data, true)}</div></div><div class="r">${fh(s.total, data)}<div style="margin-top:3px">${bd}</div></div><span class="chev">›</span></div>`;
+  }).join('')}</div>`;
+}
+function postitBlock(d, withTitle) {
+  const mod = dirty[d];
+  return `<div class="postit">${withTitle ? `<h3>📝 ${esc(d)} ${mod ? '<span class="mod">modifié</span>' : ''}</h3>` : (mod ? '<h3><span class="mod">modifié</span></h3>' : '')}
+  <textarea data-disc="${esc(d)}" placeholder="Notes libres…" oninput="onNote(this)">${esc(noteOf(d))}</textarea></div>`;
+}
+function viewDiscDetail(d) {
+  const data = store()[d]; if (!data) return '';
+  const s = discSummary(d);
+  const seg = `<div class="seg">${[['services', 'Services'], ['teachers', 'Enseignants'], ['note', '📝 Post-it']].map(([k, l]) => `<button class="${ui.discTab === k ? 'on' : ''}" onclick="go({discTab:'${k}'})">${l}</button>`).join('')}</div>`;
+  const head = `<div class="kpis"><div class="kpi"><span>Volume ventilé</span><strong>${fh(s.raw, data)}</strong></div><div class="kpi"><span>HSA</span><strong style="color:var(${s.hsa < -0.004 ? '--bad' : '--ok'})">${fh(s.hsa, data, true)}</strong></div></div>`;
+  let body = '';
+  if (ui.discTab === 'services') {
+    body = `<div class="card">${s.svcs.length ? s.svcs.map(x => {
+      const bd = x.co ? '<span class="badge b-gray">co-enseignement</span>' : (x.diff > 0.004 ? `<span class="badge b-bad">reste ${fh(x.diff, data)}</span>` : (x.diff < -0.004 ? `<span class="badge b-warn">+${fh(-x.diff, data)}</span>` : '<span class="badge b-ok">ventilé</span>'));
+      const who = Object.entries(x.sv.allocations || {}).filter(([, v]) => num(v) > 0).map(([t, v]) => `${esc(t)} ${fh(num(v), data)}`).join(' · ');
+      return `<div class="row" style="cursor:default;align-items:flex-start"><div class="main"><div class="t" style="white-space:normal"><span class="chip">${esc(svcLevels(x.sv).join(', '))}</span>${esc(x.sv.name || '(sans intitulé)')}</div><div class="s">${fr(num(x.sv.classes), 1)} cl. × ${fh(num(x.sv.hours), data)} = ${fh(x.target, data)}</div>${who ? `<div class="s">${who}</div>` : ''}</div><div class="r">${bd}</div></div>`;
+    }).join('') : '<div class="empty" style="padding:14px">Aucun service.</div>'}</div>`;
+  } else if (ui.discTab === 'teachers') {
+    body = `<div class="card">${(data.teachers || []).length ? data.teachers.map(t => { const m = teacherSummary(d, t); return teacherRow(d, t, m, data); }).join('') : '<div class="empty" style="padding:14px">Aucun enseignant.</div>'}</div>`;
+  } else body = postitBlock(d, false) + '<p class="note">Enregistré automatiquement sur ce téléphone. Pour le retrouver dans VectisDHG Autonomie, exportez le fichier depuis l\'onglet Fichier.</p>';
+  return head + seg + body;
+}
+function teacherRow(d, t, m, data) {
+  return `<div class="row" onclick="go({tab:'teach',teacher:{d:${JSON.stringify(d).replace(/"/g, '&quot;')},t:${JSON.stringify(t).replace(/"/g, '&quot;')}}})"><div class="main"><div class="t">${esc(t)}</div><div class="s">${esc(d)} · ORS ${fh(m.apport, data)}</div></div><div class="r">${fh(m.total, data)}<div style="margin-top:3px"><span class="badge ${m.hsa > 0.004 ? 'b-warn' : (m.hsa < -0.004 ? 'b-bad' : 'b-ok')}">${fh(m.hsa, data, true)}</span></div></div><span class="chev">›</span></div>`;
+}
+function viewTeachList() {
+  const q = ui.tq.trim().toLowerCase(); const items = [];
+  Object.keys(store()).forEach(d => (store()[d].teachers || []).forEach(t => { if (!q || t.toLowerCase().includes(q) || d.toLowerCase().includes(q)) items.push([d, t]); }));
+  items.sort((a, b) => a[1].localeCompare(b[1], 'fr'));
+  return `<input class="txt" type="search" id="tq" placeholder="Rechercher un enseignant ou une discipline" value="${esc(ui.tq)}" oninput="onTq(this.value)" autocomplete="off">
+  <div class="card" id="tlist">${teachListBody(items)}</div>`;
+}
+function teachListBody(items) {
+  return items.length ? items.map(([d, t]) => teacherRow(d, t, teacherSummary(d, t), store()[d])).join('') : '<div class="empty" style="padding:14px">Aucun résultat.</div>';
+}
+function onTq(v) {
+  ui.tq = v; const q = v.trim().toLowerCase(); const items = [];
+  Object.keys(store()).forEach(d => (store()[d].teachers || []).forEach(t => { if (!q || t.toLowerCase().includes(q) || d.toLowerCase().includes(q)) items.push([d, t]); }));
+  items.sort((a, b) => a[1].localeCompare(b[1], 'fr'));
+  $('tlist').innerHTML = teachListBody(items);
+}
+function viewTeacher(d, t) {
+  const data = store()[d]; if (!data) return '';
+  const m = teacherSummary(d, t);
+  const rows = m.rows.length ? m.rows.map(r => `<tr><td><span class="chip">${esc(r.level)}</span>${esc(r.name)}</td><td class="n">${fh(r.hours, data)}${r.active ? `<br><small style="color:var(--muted)">× ${String(r.factor).replace('.', ',')}</small>` : ''}</td></tr>`).join('') : '<tr><td colspan="2" style="color:var(--muted)">Aucun service attribué</td></tr>';
+  const tot = [['Heures enseignées', fh(m.raw, data)]];
+  if (pondOn()) tot.push(['Pondérations', fh(m.pond, data)]);
+  m.ares.forEach(a => tot.push([`ARE : ${esc(a.label)}`, fh(a.hours, data)]));
+  tot.push(['Total', `<strong>${fh(m.total, data)}</strong>`], ['ORS', fh(m.apport, data)], ['HSA', `<span class="badge ${m.hsa > 0.004 ? 'b-warn' : (m.hsa < -0.004 ? 'b-bad' : 'b-ok')}">${fh(m.hsa, data, true)}</span>`]);
+  return `<div class="card"><h2>Services</h2><table class="t"><tbody>${rows}</tbody></table></div>
+  <div class="card"><h2>Totaux</h2><table class="t"><tbody>${tot.map(([a, b]) => `<tr><td>${a}</td><td class="n">${b}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function viewNotes() {
+  const names = Object.keys(store());
+  if (!names.length) return '<div class="empty"><b>📝</b>Aucune discipline.</div>';
+  return `<p class="note" style="margin-top:0">Touchez un post-it pour le modifier. Enregistrement automatique sur ce téléphone.</p>` + names.map(d => postitBlock(d, true)).join('');
+}
+function viewFile() {
+  const n = nDirty();
+  return `<div class="card"><h2>Fichier chargé</h2><div style="font-weight:650;word-break:break-all">${esc(fileName || '—')}</div><div class="s" style="font-size:.8rem;color:var(--muted)">Ouvert le ${esc(loadedAt || '—')}</div></div>
+  <div class="card"><h2>Post-it modifiés : ${n}</h2>
+    <button class="btn" ${n ? '' : 'disabled'} onclick="exportFile()">📤 Exporter le fichier mis à jour</button>
+    <p class="note">Le fichier exporté contient vos données inchangées, avec les post-it à jour. Ouvrez-le ensuite dans VectisDHG Autonomie (Fichier › Ouvrir). Il remplace le fichier précédent : ne modifiez pas l'application sur l'ordinateur entre-temps, ou ces modifications seraient perdues.</p>
+    ${n ? `<button class="btn dng" onclick="resetNotes()">↩︎ Annuler mes modifications de post-it</button>` : ''}</div>
+  <div class="card"><h2>Autre fichier</h2><button class="btn sec" onclick="askOpen()">📂 Ouvrir un autre fichier .json</button>
+    <p class="note" style="margin-bottom:0">Les données restent sur ce téléphone, rien n'est envoyé sur Internet. Astuce : dans Safari, « Partager › Sur l'écran d'accueil » installe l'application.</p></div>`;
+}
+
+// ───────── Actions ─────────
+const orig = {};  // post-it d'origine (pour annuler)
+function onNote(ta) {
+  const d = ta.dataset.disc, v = ta.value;
+  const data = store()[d]; if (!data) return;
+  if (!(d in orig)) orig[d] = (data.note === undefined ? null : data.note);
+  if (v.trim()) data.note = v; else delete data.note;
+  const changed = (orig[d] || '') !== (data.note || '');
+  if (changed) dirty[d] = true; else delete dirty[d];
+  clearTimeout(onNote._t);
+  onNote._t = setTimeout(() => { persist(); pip(); }, 300);
+}
+function pip() {
+  const b = $('nav').lastElementChild; if (!b) return;
+  let p = b.querySelector('.pip');
+  if (nDirty()) { if (!p) { p = document.createElement('span'); p.className = 'pip'; b.appendChild(p); } p.textContent = nDirty(); } else if (p) p.remove();
+}
+function askOpen() {
+  if (nDirty() && !confirm('Des post-it modifiés n\'ont pas été exportés. Ouvrir un autre fichier les effacera. Continuer ?')) return;
+  $('fileInput').click();
+}
+$('fileInput').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const o = JSON.parse(r.result);
+      if (!o || typeof o !== 'object' || !o.dataStore) throw new Error('format');
+      obj = o; fileName = f.name; dirty = {}; for (const k in orig) delete orig[k];
+      loadedAt = new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+      ui = { tab: 'home', disc: null, teacher: null, discTab: 'services', q: '', tq: '' };
+      persist(); render(); toast('Fichier chargé');
+    } catch (err) { alert('Ce fichier n\'est pas une sauvegarde VectisDHG Autonomie valide.'); }
+  };
+  r.readAsText(f); e.target.value = '';
+});
+function resetNotes() {
+  if (!confirm('Revenir aux post-it du fichier d\'origine ?')) return;
+  Object.keys(dirty).forEach(d => { const data = store()[d]; if (!data) return; if (orig[d] === null || orig[d] === undefined) delete data.note; else data.note = orig[d]; });
+  dirty = {}; for (const k in orig) delete orig[k]; persist(); render(); toast('Modifications annulées');
+}
+async function exportFile() {
+  const text = JSON.stringify(obj, null, 2);
+  const name = fileName || 'DHG.json';
+  const file = new File([text], name, { type: 'application/json' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+// ───────── Démarrage ─────────
+restore();
+render();
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
