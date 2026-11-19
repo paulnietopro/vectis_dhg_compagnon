@@ -115,7 +115,7 @@ input.txt{margin-bottom:12px}
 .snd-help{font-size:.85rem;margin:0;text-align:center;color:#334155}
 .snd-stage canvas{max-width:100%;height:auto;image-rendering:pixelated}
 .snd-count{font-weight:650}
-.snd-ctl{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.snd-adv{font-size:.85rem;text-align:center}.snd-ctl{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 </style>
 </head>
 <body>
@@ -136,11 +136,11 @@ input.txt{margin-bottom:12px}
   <p class="snd-help">Dans VectisDHG Autonomie : <b>Fichier › 📷 Modifications du téléphone (QR)</b>, puis placez l'écran du téléphone devant la webcam (luminosité maximale).</p>
   <div class="snd-stage"><canvas id="sndCanvas"></canvas></div>
   <div id="sndCount" class="snd-count"></div>
-  <div class="snd-ctl">
+  <details class="snd-adv"><summary>Réglages (si la lecture échoue)</summary><div class="snd-ctl" id="sndCtl">
     <select onchange="sndSetChunk(this.value)"><option value="350">Petites images</option><option value="600" selected>Moyennes</option><option value="900">Grandes</option></select>
     <select onchange="sndSetFps(this.value)"><option value="2">Lente</option><option value="4" selected>Normale</option><option value="6">Rapide</option></select>
     <button class="btn sec" id="sndPause" style="width:auto;padding:8px 14px" onclick="sndTogglePause()">⏸ Pause</button>
-  </div>
+  </div></details>
 </div>
 
 <script>
@@ -1181,6 +1181,14 @@ function deltaPayload() {
   const ep = (obj.epleIdentity || {}), now = new Date();
   return { format: 'vectis-modifications', version: 1, createdAt: now.toISOString(), source: 'VectisDHG Compagnon', sourceFile: fileName, eple: { name: ep.name || '', uai: ep.uai || '' }, ops: journal };
 }
+function sndSingle(data, flags, crc, sid) {
+    // Un code unique n'est lu de façon fiable que s'il reste peu dense (version ≤ 16, soit ≈ 450 octets compressés)
+    if (data.length + QRX_HEAD > 440) return null;
+    const f = new Uint8Array(QRX_HEAD + data.length);
+    f[0] = 0x56; f[1] = 0x51; f[2] = flags; f[3] = sid >> 8; f[4] = sid & 255; f[7] = 0; f[8] = 1;
+    f[9] = crc >>> 24; f[10] = (crc >>> 16) & 255; f[11] = (crc >>> 8) & 255; f[12] = crc & 255; f.set(data, QRX_HEAD);
+    try { const m = qrEncodeBytes(f, 'M'); return m.ver <= 16 ? m : null; } catch (e) { return null; }
+}
 async function sndPrepare() {
   const raw = new TextEncoder().encode(JSON.stringify(deltaPayload()));
   let data = raw, flags = 0;
@@ -1191,13 +1199,18 @@ async function sndPrepare() {
     f[0] = 0x56; f[1] = 0x51; f[2] = flags; f[3] = sid >> 8; f[4] = sid & 255; f[5] = i >> 8; f[6] = i & 255; f[7] = total >> 8; f[8] = total & 255;
     f[9] = crc >>> 24; f[10] = (crc >>> 16) & 255; f[11] = (crc >>> 8) & 255; f[12] = crc & 255; f.set(part, QRX_HEAD); bufs.push(f);
   }
-  let ver = 1; const first = bufs.map(b => qrEncodeBytes(b, 'M')); first.forEach(q => { ver = Math.max(ver, q.ver); });
-  SND.frames = first.map((q, i) => q.ver === ver ? q : qrEncodeBytes(bufs[i], 'M', ver));
+  SND.single = false;
+  const one = sndSingle(data, flags, crc, sid);
+  if (one) { SND.frames = [one]; SND.single = true; }
+  else {
+    let ver = 1; const first = bufs.map(b => qrEncodeBytes(b, 'M')); first.forEach(q => { ver = Math.max(ver, q.ver); });
+    SND.frames = first.map((q, i) => q.ver === ver ? q : qrEncodeBytes(bufs[i], 'M', ver));
+  }
 }
 function sndShow() {
   const cv = $('sndCanvas'); if (!cv || !SND.frames.length) return;
-  const q = SND.frames[SND.idx], px = Math.max(3, Math.floor(Math.min(560, window.innerWidth - 24) / (q.size + 8)));
-  qrDraw(cv, q, px); $('sndCount').textContent = `Image ${SND.idx + 1} / ${SND.frames.length}`;
+  const q = SND.frames[SND.idx], dpr = Math.max(1, Math.round(window.devicePixelRatio || 1)), px = Math.max(3, Math.floor(Math.min(SND.single ? 900 : 560, window.innerWidth - 24) * dpr / (q.size + 8)));
+  qrDraw(cv, q, px); cv.style.width = cv.style.height = (cv.width / dpr) + 'px'; $('sndCount').textContent = SND.single ? 'Un seul code QR' : `Image ${SND.idx + 1} / ${SND.frames.length}`;
 }
 function sndTimer() { clearInterval(SND.timer); SND.timer = setInterval(() => { if (SND.paused || !SND.frames.length) return; SND.idx = (SND.idx + 1) % SND.frames.length; sndShow(); }, Math.round(1000 / SND.fps)); }
 async function startSend() {
