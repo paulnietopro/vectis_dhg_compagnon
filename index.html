@@ -119,6 +119,8 @@ input.txt{margin-bottom:12px}
 .vent .vt{display:flex;align-items:baseline;gap:8px;margin:2px 0 6px}.vent .vt strong{font-size:1.5rem}.vent .vt span{color:var(--muted);font-size:.8rem}
 .vent .vl{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--line,var(--border,#e2e8f0));font-size:.88rem}
 .vent .vl span{color:var(--muted)}
+.lk{flex:none;border:0;background:transparent;font-size:1.15rem;line-height:1;padding:6px 8px 6px 0;margin-left:-4px;cursor:pointer;opacity:.55}.lk.on{opacity:1}
+.lkbtn{margin:0 0 10px}
 </style>
 </head>
 <body>
@@ -319,20 +321,11 @@ function viewHome() {
   <div class="kpis">
     <div class="kpi"><span>Dotation (DHG)</span><strong>${fr(g.dgh, 1)} h</strong><small>${fr(g.hp, 1)} HP + ${fr(g.hsa, 1)} HSA</small></div>
     <div class="kpi"><span>Heures ventilées</span><strong>${fr(g.used, 1)} h</strong><small>${pondOn() ? 'pond. et ARE compris' : 'ARE compris'}</small></div>
-    <div class="kpi wide"><span>${lab}</span><strong style="color:var(${over ? '--bad' : '--ok'})">${over ? '+' : ''}${fr(Math.abs(g.remaining), 2)} h</strong>
-      <div class="bar"><i class="${over ? 'over' : ''}" style="width:${pct}%"></i></div><small>${fr(g.dgh > 0 ? g.used / g.dgh * 100 : 0, 1)} % de la dotation utilisée</small></div>
+    <div class="kpi"><span>À ventiler</span><strong>${fr(g.ventTot, 1)} h</strong><small>${g.nServ} service${g.nServ > 1 ? 's' : ''}${pondOn() ? ', pond.' : ''} et ARE</small></div>
+    <div class="kpi"><span>${lab}</span><strong style="color:var(${over ? '--bad' : '--ok'})">${over ? '+' : ''}${fr(Math.abs(g.remaining), 1)} h</strong><small>sur la dotation</small></div>
+    <div class="kpi wide"><span>Dotation utilisée</span><strong>${fr(g.dgh > 0 ? g.used / g.dgh * 100 : 0, 1)} %</strong>
+      <div class="bar"><i class="${over ? 'over' : ''}" style="width:${pct}%"></i></div></div>
   </div>
-  <div class="card vent"><h2>À ventiler</h2>
-    <div class="vt"><strong>${fr(g.ventTot, 2)} h</strong><span>total à ventiler</span></div>
-    <div class="bar"><i class="${g.ventRest < -0.004 ? 'over' : ''}" style="width:${g.dgh > 0 ? Math.min(100, Math.max(0, g.ventTot / g.dgh * 100)) : 0}%"></i></div>
-    <div class="vl"><span>Services créés (${g.nServ})</span><b>${fr(g.vol, 2)} h</b></div>
-    ${pondOn() ? `<div class="vl"><span>+ Pondérations</span><b>${fr(g.pondTot, 2)} h</b></div>` : ''}
-    <div class="vl"><span>+ ARE</span><b>${fr(g.areTot, 2)} h</b></div>
-    <div class="vl"><span>Dotation</span><b>${fr(g.dgh, 2)} h</b></div>
-    <div class="vl"><span>Dotation − total à ventiler</span><b style="color:var(${g.ventRest < -0.004 ? '--bad' : '--ok'})">${g.ventRest > 0.004 ? '+' : ''}${fr(g.ventRest, 2)} h</b></div>
-    <div class="vl"><span>Heures de services déjà ventilées</span><b>${fr(g.usedRaw, 2)} h</b></div>
-    <div class="vl"><span>Heures de services restantes</span><b>${fr(g.toVent, 2)} h</b></div>
-    ${pondOn() && g.pondEst > 0.004 ? `<div class="note">Pondérations : dont ${fr(g.pondEst, 2)} h estimées sur les heures non encore ventilées.</div>` : ''}</div>
   <div class="card"><h2>À surveiller · ${g.nTodo} service${g.nTodo > 1 ? 's' : ''} à ventiler${g.nOver ? ` · ${g.nOver} sur-ventilé${g.nOver > 1 ? 's' : ''}` : ''}</h2>
     ${al || '<div class="empty" style="padding:12px">✅ Tous les services sont ventilés.</div>'}
     ${g.alerts.length > 8 ? `<div class="note">… et ${g.alerts.length - 8} autres (voir chaque discipline).</div>` : ''}</div>`;
@@ -361,7 +354,8 @@ function viewDiscDetail(d) {
     body = `<div class="card">${s.svcs.length ? s.svcs.map(x => {
       const bd = x.co ? '<span class="badge b-gray">co-ens.</span>' : (x.diff > 0.004 ? `<span class="badge b-bad">reste ${fh(x.diff, data)}</span>` : (x.diff < -0.004 ? `<span class="badge b-warn">+${fh(-x.diff, data)}</span>` : '<span class="badge b-ok">ventilé</span>'));
       const who = Object.entries(x.sv.allocations || {}).filter(([, v]) => num(v) > 0).map(([t, v]) => `${esc(t)} ${fh(num(v), data)}`).join(' · ');
-      return `<div class="row" style="align-items:flex-start" onclick="openService(${JSON.stringify(d).replace(/"/g, '&quot;')},${x.si})"><div class="main"><div class="t" style="white-space:normal"><span class="chip">${esc(svcLevels(x.sv).join(', '))}</span>${esc(x.sv.name || '(sans intitulé)')}</div><div class="s">${fr(num(x.sv.classes), 1)} cl. × ${fh(num(x.sv.hours), data)} = ${fh(x.target, data)}</div>${who ? `<div class="s">${who}</div>` : ''}</div><div class="r">${bd}</div><span class="chev">›</span></div>`;
+      const dq = JSON.stringify(d).replace(/"/g, '&quot;');
+      return `<div class="row" style="align-items:flex-start" onclick="openService(${dq},${x.si})"><button type="button" class="lk ${x.sv.locked ? 'on' : ''}" onclick="event.stopPropagation();toggleLock(${dq},${x.si})" aria-label="${x.sv.locked ? 'Déverrouiller' : 'Verrouiller'} le service">${x.sv.locked ? '🔒' : '🔓'}</button><div class="main"><div class="t" style="white-space:normal"><span class="chip">${esc(svcLevels(x.sv).join(', '))}</span>${esc(x.sv.name || '(sans intitulé)')}</div><div class="s">${fr(num(x.sv.classes), 1)} cl. × ${fh(num(x.sv.hours), data)} = ${fh(x.target, data)}</div>${who ? `<div class="s">${who}</div>` : ''}</div><div class="r">${bd}</div><span class="chev">›</span></div>`;
     }).join('') : '<div class="empty" style="padding:14px">Aucun service.</div>'}</div>`;
   } else if (ui.discTab === 'teachers') {
     body = `<button class="btn sec" onclick="openNewTeacher(${JSON.stringify(d).replace(/"/g, '&quot;')})">＋ Ajouter un enseignant</button><div class="card">${(data.teachers || []).length ? data.teachers.map(t => { const m = teacherSummary(d, t); return teacherRow(d, t, m, data); }).join('') : '<div class="empty" style="padding:14px">Aucun enseignant.</div>'}</div>`;
@@ -410,6 +404,7 @@ function opText(o) {
   if (o.k === 'alloc') return `⏱️ ${o.teacher} · ${o.svc || 'service'}${o.level ? ' (' + o.level + ')' : ''} : ${fr(o.from)} → ${fr(o.to)} h`;
   if (o.k === 'tadd') return `➕ ${o.name} (${d}), ORS ${fr(o.ors)} h`;
   if (o.k === 'trename') return `✏️ ${o.from} → ${o.to} (${d})`;
+  if (o.k === 'lock') return `${o.to ? '🔒 Verrouillé' : '🔓 Déverrouillé'} : ${o.svc || 'service'}${o.level ? ' (' + o.level + ')' : ''} — ${d}`;
   if (o.k === 'tors') return `🎓 ${o.teacher} : ORS ${fr(o.from)} → ${fr(o.to)} h`;
   return o.k;
 }
@@ -442,7 +437,7 @@ function logOp(op, key) {
     if ((o.k === 'tadd' || o.k === 'trename') && o.disc === op.disc) break;
     if (opKey(o) === key) {
       o.to = op.to;
-      const same = o.k === 'note' ? (o.from || '') === (o.to || '') : Math.abs(num(o.from) - num(o.to)) < 0.001;
+      const same = o.k === 'note' ? (o.from || '') === (o.to || '') : (o.k === 'lock' ? !!o.from === !!o.to : Math.abs(num(o.from) - num(o.to)) < 0.001);
       if (same) journal.splice(i, 1);
       return;
     }
@@ -453,6 +448,7 @@ function opKey(o) {
   if (o.k === 'note') return 'note|' + o.disc;
   if (o.k === 'alloc') return `alloc|${o.disc}|${o.sIndex}|${o.teacher}`;
   if (o.k === 'tors') return `tors|${o.disc}|${o.teacher}`;
+  if (o.k === 'lock') return `lock|${o.disc}|${o.sIndex}`;
   return null;
 }
 function save() { clearTimeout(save._t); save._t = setTimeout(() => { persist(); pip(); }, 250); }
@@ -467,6 +463,14 @@ function setNote(d, v) {
 }
 function onNote(ta) { setNote(ta.dataset.disc, ta.value); }
 
+function toggleLock(od, si, inSheet) {
+  const sv = store()[od] && store()[od].services[si]; if (!sv) return;
+  const from = !!sv.locked, to = !from;
+  sv.locked = to;
+  logOp({ k: 'lock', disc: od, sIndex: si, svc: sv.name || '', level: sv.level || '', from, to }, `lock|${od}|${si}`);
+  save();
+  if (inSheet && sheet && sheet.type === 'svc') renderServiceSheet(); else render();
+}
 function setAlloc(od, si, teacher, val) {
   const sv = store()[od] && store()[od].services[si]; if (!sv) return;
   const from = r2(sv.allocations && sv.allocations[teacher]), to = Math.max(0, r2(val));
@@ -569,7 +573,7 @@ function openService(od, si) {
 }
 function renderServiceSheet() {
   const { od, si, names } = sheet, sv = store()[od].services[si], data = store()[od];
-  const ro = sv.locked ? '🔒 Ce service est verrouillé sur l\'ordinateur : modification impossible ici.' : (sv.isCoEnseignement ? 'Service de co-enseignement : à modifier sur l\'ordinateur.' : '');
+  const ro = sv.locked ? '🔒 Ce service est verrouillé : déverrouillez-le pour modifier les heures.' : (sv.isCoEnseignement ? 'Service de co-enseignement : à modifier sur l\'ordinateur.' : '');
   const rows = names.map((t, i) => {
     const v = num(sv.allocations && sv.allocations[t]);
     return `<div class="srow"><div class="sname">${esc(t)}</div>${ro
@@ -577,6 +581,7 @@ function renderServiceSheet() {
       : `<div class="stepper"><button type="button" onclick="stepAlloc(${i},-0.5)" aria-label="Moins">−</button><input id="al${i}" type="text" inputmode="decimal" value="${fr(v)}" onchange="setAllocInput(${i}, this.value)" onfocus="this.select()"><button type="button" onclick="stepAlloc(${i},0.5)" aria-label="Plus">+</button></div>`}</div>`;
   }).join('');
   openSheet(`<div class="sh-head"><div><span class="chip">${esc(svcLevels(sv).join(', '))}</span><strong>${esc(sv.name || '(sans intitulé)')}</strong><div class="s" style="font-size:.8rem;color:var(--muted)">${esc(od)} · ${fr(num(sv.classes), 1)} cl. × ${fh(num(sv.hours), data)}</div></div><button class="back" onclick="closeSheet()">Fermer</button></div>
+    <button type="button" class="btn sec lkbtn" onclick="toggleLock(${JSON.stringify(od).replace(/"/g, '&quot;')},${si},true)">${sv.locked ? '🔓 Déverrouiller ce service' : '🔒 Verrouiller ce service'}</button>
     <div id="svcSummary" class="sumbox"></div>
     ${ro ? `<p class="note" style="margin-top:0">${ro}</p>` : ''}
     <div>${rows || '<div class="empty" style="padding:14px">Aucun enseignant dans cette discipline.</div>'}</div>`);
