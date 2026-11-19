@@ -103,6 +103,19 @@ input.txt{margin-bottom:12px}
 .stepper button{width:44px;height:44px;border:0;border-radius:12px;background:var(--brand-soft);color:var(--brand);font-size:1.5rem;font-weight:700;line-height:1}
 .stepper input{width:70px;height:44px;text-align:center;font-size:1.1rem;font-weight:700;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--text);font-variant-numeric:tabular-nums}
 .hidden{display:none!important}
+.scan{position:fixed;inset:0;z-index:50;background:#000;display:flex;flex-direction:column}
+.scan video{flex:1;width:100%;object-fit:cover;min-height:0}
+.scan-frame{position:absolute;left:12%;right:12%;top:18%;aspect-ratio:1;border:3px solid rgba(255,255,255,.85);border-radius:18px;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,.28)}
+.scan-panel{position:absolute;left:0;right:0;bottom:0;padding:14px 16px calc(14px + env(safe-area-inset-bottom));background:rgba(15,23,42,.92);color:#fff;display:flex;flex-direction:column;gap:10px;text-align:center}
+.scan-bar{display:flex;gap:2px;flex-wrap:wrap;justify-content:center;max-height:44px;overflow:hidden}
+.scan-bar i{width:9px;height:9px;border-radius:2px;background:#475569}
+.scan-bar i.on{background:#4ade80}
+.snd{position:fixed;inset:0;z-index:60;background:#fff;color:#0f172a;display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;overflow:auto}
+.snd-top{display:flex;justify-content:space-between;align-items:center;width:100%}
+.snd-help{font-size:.85rem;margin:0;text-align:center;color:#334155}
+.snd-stage canvas{max-width:100%;height:auto;image-rendering:pixelated}
+.snd-count{font-weight:650}
+.snd-ctl{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 </style>
 </head>
 <body>
@@ -112,6 +125,23 @@ input.txt{margin-bottom:12px}
 <input type="file" id="fileInput" accept=".json,application/json" class="hidden">
 <div class="sheet hidden" id="sheet"><div class="sheet-bg" onclick="closeSheet()"></div><div class="sheet-card" id="sheetCard"></div></div>
 <div class="toast" id="toast"></div>
+<div class="scan hidden" id="scan">
+  <video id="scanVideo" playsinline muted autoplay></video><canvas id="scanCanvas" class="hidden"></canvas>
+  <div class="scan-frame"></div>
+  <div class="scan-panel"><div id="scanInfo">Pointez l'appareil vers l'écran de l'ordinateur…</div><div id="scanBar" class="scan-bar"></div>
+    <button class="btn sec" onclick="stopScan()">Annuler</button></div>
+</div>
+<div class="snd hidden" id="snd">
+  <div class="snd-top"><b>Envoi vers l'ordinateur</b><button class="btn sec" style="width:auto;padding:8px 14px" onclick="stopSend()">Fermer</button></div>
+  <p class="snd-help">Dans VectisDHG Autonomie : <b>Fichier › 📷 Modifications du téléphone (QR)</b>, puis placez l'écran du téléphone devant la webcam (luminosité maximale).</p>
+  <div class="snd-stage"><canvas id="sndCanvas"></canvas></div>
+  <div id="sndCount" class="snd-count"></div>
+  <div class="snd-ctl">
+    <select onchange="sndSetChunk(this.value)"><option value="350">Petites images</option><option value="600" selected>Moyennes</option><option value="900">Grandes</option></select>
+    <select onchange="sndSetFps(this.value)"><option value="2">Lente</option><option value="4" selected>Normale</option><option value="6">Rapide</option></select>
+    <button class="btn sec" id="sndPause" style="width:auto;padding:8px 14px" onclick="sndTogglePause()">⏸ Pause</button>
+  </div>
+</div>
 
 <script>
 'use strict';
@@ -269,7 +299,8 @@ function render() {
 function viewWelcome() {
   return `<div class="empty"><b>📱</b><h2 style="margin:0 0 6px;color:var(--text)">Bienvenue</h2>
   Ouvrez une sauvegarde (.json) enregistrée depuis VectisDHG Autonomie pour la consulter et modifier vos post-it.</div>
-  <button class="btn" onclick="$('fileInput').click()">📂 Ouvrir un fichier .json</button>
+  <button class="btn" onclick="startScan()">📷 Recevoir depuis l'ordinateur (QR)</button>
+  <button class="btn sec" onclick="$('fileInput').click()">📂 Ouvrir un fichier .json</button>
   <p class="note">Le fichier reste sur votre téléphone : rien n'est envoyé sur Internet.</p>`;
 }
 function viewHome() {
@@ -371,13 +402,16 @@ function viewFile() {
   return `<div class="card"><h2>Fichier chargé</h2><div style="font-weight:650;word-break:break-all">${esc(fileName || '—')}</div><div class="s" style="font-size:.8rem;color:var(--muted)">Ouvert le ${esc(loadedAt || '—')}</div></div>
   <div class="card"><h2>Modifications en attente : ${n}</h2>${list}
     <div style="height:10px"></div>
-    <button class="btn" ${n ? '' : 'disabled'} onclick="exportDelta()">📤 Exporter les modifications</button>
-    <p class="note">Envoyez ce petit fichier vers l'ordinateur (AirDrop, mail, Nuage…), puis dans VectisDHG Autonomie : <strong>Fichier › Modifications du téléphone</strong>. Vous vérifiez chaque changement avant de l'appliquer ; les conflits éventuels sont signalés.</p>
+    <button class="btn" ${n ? '' : 'disabled'} onclick="startSend()">📲 Envoyer à l'ordinateur (QR)</button>
+    <p class="note">Mode direct, sans fichier : l'ordinateur doit avoir une webcam. Dans VectisDHG Autonomie : <strong>Fichier › Modifications du téléphone (QR)</strong>, puis montrez l'écran du téléphone à la webcam.</p>
+    <button class="btn sec" ${n ? '' : 'disabled'} onclick="exportDelta()">📤 Partager un fichier (AirDrop, Mail…)</button>
+    <p class="note">Sans webcam : envoyez ce petit fichier (AirDrop, mail, Nuage…), puis dans VectisDHG Autonomie : <strong>Fichier › Modifications du téléphone (fichier)</strong>. Vous vérifiez chaque changement avant de l'appliquer ; les conflits éventuels sont signalés.</p>
     ${n ? `<button class="btn sec" onclick="clearJournal()">✓ Modifications importées : vider la liste</button>
     <button class="btn dng" onclick="resetAll()">↩︎ Annuler toutes mes modifications</button>` : ''}</div>
   <div class="card"><h2>Fichier complet</h2><button class="btn sec" ${n ? '' : 'disabled'} onclick="exportFile()">📤 Exporter le fichier complet</button>
     <p class="note" style="margin-bottom:0">Remplace entièrement l'ancien fichier sur l'ordinateur : à réserver au cas où rien n'a changé là-bas.</p></div>
-  <div class="card"><h2>Autre fichier</h2><button class="btn sec" onclick="askOpen()">📂 Ouvrir un autre fichier .json</button>
+  <div class="card"><h2>Autre fichier</h2><button class="btn sec" onclick="startScan()">📷 Recevoir depuis l'ordinateur (QR)</button>
+    <button class="btn sec" onclick="askOpen()" style="margin-top:8px">📂 Ouvrir un autre fichier .json</button>
     <p class="note" style="margin-bottom:0">Les données restent sur ce téléphone, rien n'est envoyé sur Internet. Astuce : dans Safari, « Partager › Sur l'écran d'accueil » installe l'application.</p></div>
   <div class="card"><h2>Fichier dans Nuage / Nextcloud</h2><p class="note" style="margin:0">Installez l'application Nextcloud et connectez-la à Nuage : vos fichiers apparaissent dans « Ouvrir un fichier ». Pour le retour, enregistrez le fichier exporté dans Fichiers › Nuage.</p></div>`;
 }
@@ -624,6 +658,562 @@ function exportDelta() {
   const payload = { format: 'vectis-modifications', version: 1, createdAt: now.toISOString(), source: 'VectisDHG Compagnon', sourceFile: fileName, eple: { name: ep.name || '', uai: ep.uai || '' }, ops: journal };
   return shareText(JSON.stringify(payload, null, 2), `Modifications_Compagnon_${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}_${p(now.getHours())}h${p(now.getMinutes())}.json`);
 }
+
+// ───────── Codes QR : décodeur maison ─────────
+// ── QR : constantes et fonctions communes (versions 1 à 40, correction L/M/Q/H) ──
+const QR_ECC = { L: 0, M: 1, Q: 2, H: 3 };
+const QR_ECC_FORMAT_BITS = [1, 0, 3, 2];                       // L, M, Q, H
+const QR_EC_PER_BLOCK = [
+    [-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+    [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
+    [-1, 13, 22, 18, 26, 18, 24, 18, 22, 20, 24, 28, 26, 24, 20, 30, 24, 28, 28, 26, 30, 28, 30, 30, 30, 30, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+    [-1, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28, 30, 24, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30]
+];
+const QR_BLOCKS = [
+    [-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25],
+    [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49],
+    [-1, 1, 1, 2, 2, 4, 4, 6, 6, 8, 8, 8, 10, 12, 16, 12, 17, 16, 18, 21, 20, 23, 23, 25, 27, 29, 34, 34, 35, 38, 40, 43, 45, 48, 51, 53, 56, 59, 62, 65, 68],
+    [-1, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81]
+];
+function qrNumRawModules(ver) {
+    let r = (16 * ver + 128) * ver + 64;
+    if (ver >= 2) { const na = Math.floor(ver / 7) + 2; r -= (25 * na - 10) * na - 55; if (ver >= 7) r -= 36; }
+    return r;
+}
+function qrNumDataCodewords(ver, ecl) { return Math.floor(qrNumRawModules(ver) / 8) - QR_EC_PER_BLOCK[ecl][ver] * QR_BLOCKS[ecl][ver]; }
+function qrAlignPositions(ver) {
+    if (ver === 1) return [];
+    const n = Math.floor(ver / 7) + 2, step = ver === 32 ? 26 : Math.ceil((ver * 4 + 4) / (n * 2 - 2)) * 2, size = ver * 4 + 17, r = [6];
+    for (let pos = size - 7; r.length < n; pos -= step) r.splice(1, 0, pos);
+    return r;
+}
+// Masque des modules « fonction » (true = ne porte pas de données)
+function qrFunctionMask(ver) {
+    const size = ver * 4 + 17, m = new Uint8Array(size * size);
+    const fill = (x0, y0, w, h) => { for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (x >= 0 && y >= 0 && x < size && y < size) m[y * size + x] = 1; };
+    fill(0, 0, 9, 9); fill(size - 8, 0, 8, 9); fill(0, size - 8, 9, 8);
+    fill(6, 0, 1, size); fill(0, 6, size, 1);
+    const ap = qrAlignPositions(ver);
+    ap.forEach((cx, i) => ap.forEach((cy, j) => {
+        if ((i === 0 && j === 0) || (i === 0 && j === ap.length - 1) || (i === ap.length - 1 && j === 0)) return;
+        fill(cx - 2, cy - 2, 5, 5);
+    }));
+    if (ver >= 7) { fill(size - 11, 0, 3, 6); fill(0, size - 11, 6, 3); }
+    return m;
+}
+// Corps de Galois GF(256), polynôme 0x11D
+const QR_EXP = new Uint8Array(512), QR_LOG = new Uint8Array(256);
+(function () { let x = 1; for (let i = 0; i < 255; i++) { QR_EXP[i] = x; QR_LOG[x] = i; x <<= 1; if (x & 0x100) x ^= 0x11D; } for (let i = 255; i < 512; i++) QR_EXP[i] = QR_EXP[i - 255]; })();
+const qrMul = (a, b) => (a === 0 || b === 0) ? 0 : QR_EXP[QR_LOG[a] + QR_LOG[b]];
+
+// ── QR : décodeur d'image (mode octets), pour la caméra ──
+// Entrée : niveaux de gris (Uint8Array w*h). Sortie : Uint8Array des octets décodés, ou null.
+function qrBinarize(gray, w, h) {
+    const r = Math.max(6, Math.round(Math.min(w, h) / 14)), I = new Float64Array((w + 1) * (h + 1));
+    for (let y = 0; y < h; y++) { let row = 0; for (let x = 0; x < w; x++) { row += gray[y * w + x]; I[(y + 1) * (w + 1) + x + 1] = I[y * (w + 1) + x + 1] + row; } }
+    const bin = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+        const y0 = Math.max(0, y - r), y1 = Math.min(h, y + r + 1);
+        for (let x = 0; x < w; x++) {
+            const x0 = Math.max(0, x - r), x1 = Math.min(w, x + r + 1), n = (x1 - x0) * (y1 - y0);
+            const mean = (I[y1 * (w + 1) + x1] - I[y0 * (w + 1) + x1] - I[y1 * (w + 1) + x0] + I[y0 * (w + 1) + x0]) / n;
+            bin[y * w + x] = gray[y * w + x] < mean - 8 ? 1 : 0;
+        }
+    }
+    bin.integral = I; return bin;
+}
+// Détection des motifs de repérage (rapport 1:1:3:1:1)
+function qrFindFinders(bin, w, h) {
+    const cands = [];
+    const check = (runs, tol) => {
+        const total = runs[0] + runs[1] + runs[2] + runs[3] + runs[4]; if (total < 7) return 0;
+        const m = total / 7, t = m * tol;
+        return (Math.abs(runs[0] - m) < t && Math.abs(runs[1] - m) < t && Math.abs(runs[2] - 3 * m) < 3 * t && Math.abs(runs[3] - m) < t && Math.abs(runs[4] - m) < t) ? m : 0;
+    };
+    const crossV = (cx, cy, m) => {   // vérifie la colonne
+        const runs = [0, 0, 0, 0, 0]; let y = cy;
+        while (y >= 0 && bin[y * w + cx]) { runs[2]++; y--; } if (y < 0) return null;
+        while (y >= 0 && !bin[y * w + cx]) { runs[1]++; y--; } if (y < 0) return null;
+        while (y >= 0 && bin[y * w + cx]) { runs[0]++; y--; }
+        y = cy + 1; while (y < h && bin[y * w + cx]) { runs[2]++; y++; } if (y >= h) return null;
+        while (y < h && !bin[y * w + cx]) { runs[3]++; y++; } if (y >= h) return null;
+        while (y < h && bin[y * w + cx]) { runs[4]++; y++; }
+        const mm = check(runs, 0.6); if (!mm) return null;
+        const start = cy - (runs[2] >> 1) - 0; return { m: mm, c: cy - runs[2] / 2 + runs[2] / 2 + (runs[4] - runs[0]) * 0 };
+    };
+    for (let y = 0; y < h; y++) {
+        const runs = [0, 0, 0, 0, 0]; let state = 0, x = 0, start = 0;
+        // balayage par plages
+        let prev = bin[y * w], len = 0, list = [];
+        for (x = 0; x < w; x++) { const v = bin[y * w + x]; if (v === prev) len++; else { list.push([prev, len]); prev = v; len = 1; } }
+        list.push([prev, len]);
+        let pos = 0; const starts = []; list.forEach(([v, l]) => { starts.push(pos); pos += l; });
+        for (let i = 0; i + 4 < list.length; i++) {
+            if (!list[i][0]) continue;
+            const rr = [list[i][1], list[i + 1][1], list[i + 2][1], list[i + 3][1], list[i + 4][1]];
+            const m = check(rr, 0.6); if (!m) continue;
+            const cx = Math.round(starts[i + 2] + list[i + 2][1] / 2 - 0.5);
+            // recherche verticale du centre exact
+            let up = y, dn = y; while (up > 0 && bin[(up - 1) * w + cx]) up--; while (dn < h - 1 && bin[(dn + 1) * w + cx]) dn++;
+            const cy = (up + dn) / 2, v = crossV(cx, Math.round(cy), m); if (!v) continue;
+            // horizontal à la hauteur du centre
+            const yy = Math.round(cy), rowRuns = [0, 0, 0, 0, 0]; let xx = cx;
+            while (xx >= 0 && bin[yy * w + xx]) { rowRuns[2]++; xx--; } while (xx >= 0 && !bin[yy * w + xx]) { rowRuns[1]++; xx--; } while (xx >= 0 && bin[yy * w + xx]) { rowRuns[0]++; xx--; }
+            xx = cx + 1; while (xx < w && bin[yy * w + xx]) { rowRuns[2]++; xx++; } while (xx < w && !bin[yy * w + xx]) { rowRuns[3]++; xx++; } while (xx < w && bin[yy * w + xx]) { rowRuns[4]++; xx++; }
+            const m2 = check(rowRuns, 0.6); if (!m2) continue;
+            const fx = cx + (rowRuns[4] - rowRuns[0]) / 2 * 0 + 0, ms = (m + v.m + m2) / 3;
+            // centre précis : milieu du segment central
+            const x0 = cx - (rowRuns[2] >> 1), cxx = cx;
+            const hit = cands.find(c => Math.hypot(c.x - cxx, c.y - cy) < ms * 3 && Math.abs(c.m - ms) < ms * 0.6);
+            if (hit) { hit.x = (hit.x * hit.n + cxx) / (hit.n + 1); hit.y = (hit.y * hit.n + cy) / (hit.n + 1); hit.m = (hit.m * hit.n + ms) / (hit.n + 1); hit.n++; }
+            else cands.push({ x: cxx, y: cy, m: ms, n: 1 });
+        }
+    }
+    return cands.filter(c => c.n >= 2);
+}
+function qrChooseTriples(c) {
+    const out = [], nmax = Math.max(...c.map(p => p.n)); c = c.filter(p => p.n >= nmax * 0.3);
+    for (let i = 0; i < c.length; i++) for (let j = i + 1; j < c.length; j++) for (let k = j + 1; k < c.length; k++) {
+        const t = [c[i], c[j], c[k]], ms = (t[0].m + t[1].m + t[2].m) / 3;
+        if (t.some(p => Math.abs(p.m - ms) > ms * 0.4)) continue;
+        const d = [Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y), Math.hypot(t[0].x - t[2].x, t[0].y - t[2].y), Math.hypot(t[1].x - t[2].x, t[1].y - t[2].y)];
+        const idx = d.indexOf(Math.max(...d)), corner = [t[2], t[1], t[0]][idx], others = t.filter(p => p !== corner);
+        const a = Math.hypot(corner.x - others[0].x, corner.y - others[0].y), b = Math.hypot(corner.x - others[1].x, corner.y - others[1].y), hyp = Math.max(...d);
+        const dim0 = (a + b) / 2 / ms + 7, dimOk = Math.round((dim0 - 17) / 4) * 4 + 17;
+        if (dimOk < 21 || dimOk > 177 || Math.abs(dim0 - dimOk) > 2.2) continue;
+        const score = Math.abs(a - b) / Math.max(a, b) + Math.abs(hyp - Math.SQRT2 * (a + b) / 2) / hyp + Math.abs(dim0 - dimOk) / 4 - (t[0].n + t[1].n + t[2].n) / (3 * nmax) * 0.2;
+        if (score > 0.5) continue;
+        const cross = (others[0].x - corner.x) * (others[1].y - corner.y) - (others[0].y - corner.y) * (others[1].x - corner.x);
+        out.push({ score, tl: corner, tr: cross > 0 ? others[0] : others[1], bl: cross > 0 ? others[1] : others[0], ms });
+    }
+    return out.sort((x, y) => x.score - y.score).slice(0, 4);
+}
+// Homographie à partir de 4 correspondances (src module -> dst image)
+function qrHomography(s, d) {
+    const n = s.length, A = [], B = [];
+    for (let i = 0; i < n; i++) {
+        A.push([s[i][0], s[i][1], 1, 0, 0, 0, -s[i][0] * d[i][0], -s[i][1] * d[i][0]]); B.push(d[i][0]);
+        A.push([0, 0, 0, s[i][0], s[i][1], 1, -s[i][0] * d[i][1], -s[i][1] * d[i][1]]); B.push(d[i][1]);
+    }
+    // équations normales (moindres carrés si plus de 4 points)
+    const M = Array.from({ length: 8 }, () => new Array(9).fill(0));
+    for (let r = 0; r < A.length; r++) for (let i = 0; i < 8; i++) { for (let j = 0; j < 8; j++) M[i][j] += A[r][i] * A[r][j]; M[i][8] += A[r][i] * B[r]; }
+    for (let i = 0; i < 8; i++) {
+        let p = i; for (let r = i + 1; r < 8; r++) if (Math.abs(M[r][i]) > Math.abs(M[p][i])) p = r;
+        [M[i], M[p]] = [M[p], M[i]];
+        if (Math.abs(M[i][i]) < 1e-12) return null;
+        for (let r = 0; r < 8; r++) if (r !== i) { const f = M[r][i] / M[i][i]; for (let c = i; c < 9; c++) M[r][c] -= f * M[i][c]; }
+    }
+    const h = M.map((row, i) => row[8] / row[i]);
+    return (x, y) => { const k = h[6] * x + h[7] * y + 1; return [(h[0] * x + h[1] * y + h[2]) / k, (h[3] * x + h[4] * y + h[5]) / k]; };
+}
+// Recherche d'un motif d'alignement autour de (ex, ey) ; renvoie {x, y, s} ou null
+function qrFindAlign(bin, w, h, ex, ey, ms, rad) {
+    let bestS = -1, bx = ex, by = ey, n = 0, sx = 0, sy = 0;
+    const at = (xx, yy, dx, dy) => { const px = Math.round(xx + dx * ms), py = Math.round(yy + dy * ms); return (px < 0 || py < 0 || px >= w || py >= h) ? 0 : bin[py * w + px]; };
+    const ring1 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]], ring2 = [[2, 0], [-2, 0], [0, 2], [0, -2], [2, 2], [-2, -2], [2, -2], [-2, 2], [2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [-1, 2], [1, -2], [-1, -2]];
+    const step = Math.max(1, Math.round(ms / 4)), scores = [];
+    for (let yy = Math.floor(ey - rad); yy <= ey + rad; yy += step) for (let xx = Math.floor(ex - rad); xx <= ex + rad; xx += step) {
+        let sc = at(xx, yy, 0, 0) * 2; ring1.forEach(([dx, dy]) => { sc += 1 - at(xx, yy, dx, dy); }); ring2.forEach(([dx, dy]) => { sc += at(xx, yy, dx, dy); });
+        scores.push([xx, yy, sc]); if (sc > bestS) bestS = sc;
+    }
+    if (bestS < 22) return null;
+    scores.forEach(([x, y, sc]) => { if (sc >= bestS - 1) { sx += x; sy += y; n++; } });
+    return { x: sx / n, y: sy / n, s: bestS };
+}
+function qrSample(bin, w, h, P, dim) {
+    const grid = new Uint8Array(dim * dim);
+    for (let y = 0; y < dim; y++) for (let x = 0; x < dim; x++) {
+        let s = 0, n = 0;
+        for (const [ox, oy] of [[0.5, 0.5], [0.3, 0.5], [0.7, 0.5], [0.5, 0.3], [0.5, 0.7]]) {
+            const [px, py] = P(x + ox, y + oy), ix = Math.round(px), iy = Math.round(py);
+            if (ix < 0 || iy < 0 || ix >= w || iy >= h) { n++; continue; } s += bin[iy * w + ix]; n++;
+        }
+        grid[y * dim + x] = s * 2 > n ? 1 : 0;
+    }
+    return grid;
+}
+// Échantillonnage en niveaux de gris : interpolation bilinéaire + seuil local à l'échelle de quelques modules
+function qrSampleGray(gray, w, h, I, P, dim, ms) {
+    const grid = new Uint8Array(dim * dim), r = Math.max(3, Math.round(ms * 4));
+    const bil = (x, y) => {
+        const x0 = Math.floor(x), y0 = Math.floor(y); if (x0 < 0 || y0 < 0 || x0 >= w - 1 || y0 >= h - 1) return -1;
+        const fx = x - x0, fy = y - y0, i = y0 * w + x0;
+        return gray[i] * (1 - fx) * (1 - fy) + gray[i + 1] * fx * (1 - fy) + gray[i + w] * (1 - fx) * fy + gray[i + w + 1] * fx * fy;
+    };
+    for (let y = 0; y < dim; y++) for (let x = 0; x < dim; x++) {
+        const [cx, cy] = P(x + 0.5, y + 0.5);
+        const ix = Math.round(cx), iy = Math.round(cy);
+        if (ix < 0 || iy < 0 || ix >= w || iy >= h) { grid[y * dim + x] = 0; continue; }
+        let v = 0, n = 0;
+        for (const [ox, oy] of [[0.5, 0.5], [0.35, 0.5], [0.65, 0.5], [0.5, 0.35], [0.5, 0.65]]) { const [px, py] = P(x + ox, y + oy), b = bil(px, py); if (b >= 0) { v += b; n++; } }
+        if (!n) { grid[y * dim + x] = 0; continue; }
+        const x0 = Math.max(0, ix - r), x1 = Math.min(w, ix + r + 1), y0 = Math.max(0, iy - r), y1 = Math.min(h, iy + r + 1);
+        const mean = (I[y1 * (w + 1) + x1] - I[y0 * (w + 1) + x1] - I[y1 * (w + 1) + x0] + I[y0 * (w + 1) + x0]) / ((x1 - x0) * (y1 - y0));
+        grid[y * dim + x] = (v / n) < mean ? 1 : 0;
+    }
+    return grid;
+}
+function qrReadFormat(g, dim) {
+    const bit = (x, y) => g[y * dim + x];
+    let a = 0, b = 0;
+    for (let i = 0; i <= 5; i++) a |= bit(8, i) << i; a |= bit(8, 7) << 6; a |= bit(8, 8) << 7; a |= bit(7, 8) << 8; for (let i = 9; i < 15; i++) a |= bit(14 - i, 8) << i;
+    for (let i = 0; i < 8; i++) b |= bit(dim - 1 - i, 8) << i; for (let i = 8; i < 15; i++) b |= bit(8, dim - 15 + i) << i;
+    let best = null, bd = 99;
+    for (let d = 0; d < 32; d++) {
+        let rem = d; for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+        const code = ((d << 10) | rem) ^ 0x5412;
+        for (const v of [a, b]) { let x = code ^ v, c = 0; while (x) { c += x & 1; x >>>= 1; } if (c < bd) { bd = c; best = d; } }
+    }
+    return bd <= 3 ? { eclBits: best >>> 3, mask: best & 7 } : null;
+}
+function qrRsCorrect(block, nEc) {
+    const n = block.length, syn = new Array(nEc).fill(0); let bad = false;
+    for (let i = 0; i < nEc; i++) { let s = 0; for (let j = 0; j < n; j++) s = qrMul(s, QR_EXP[i]) ^ block[j]; syn[i] = s; if (s) bad = true; }
+    if (!bad) return true;
+    // Berlekamp-Massey
+    let C = [1], B = [1], L = 0, m = 1, b = 1;
+    for (let i = 0; i < nEc; i++) {
+        let d = syn[i]; for (let j = 1; j <= L; j++) d ^= qrMul(C[j] || 0, syn[i - j]);
+        if (d === 0) { m++; continue; }
+        const T = C.slice(), coef = qrMul(d, QR_EXP[255 - QR_LOG[b]]);
+        while (C.length < B.length + m) C.push(0);
+        for (let j = 0; j < B.length; j++) C[j + m] ^= qrMul(coef, B[j]);
+        if (2 * L <= i) { L = i + 1 - L; B = T; b = d; m = 1; } else m++;
+    }
+    if (L > nEc / 2) return false;
+    const pos = [];
+    for (let i = 0; i < n; i++) { let s = 0; for (let j = 0; j <= L; j++) s ^= qrMul(C[j] || 0, QR_EXP[(255 - (n - 1 - i)) * j % 255]); if (s === 0) pos.push(i); }
+    if (pos.length !== L) return false;
+    // Forney : Omega = S*C mod x^nEc
+    const omega = new Array(nEc).fill(0);
+    for (let i = 0; i < nEc; i++) for (let j = 0; j <= i && j <= L; j++) omega[i] ^= qrMul(C[j] || 0, syn[i - j]);
+    pos.forEach(p => {
+        const xi = QR_EXP[n - 1 - p], xinv = QR_EXP[(255 - (n - 1 - p)) % 255];
+        let num = 0, pw = 1; for (let i = 0; i < nEc; i++) { num ^= qrMul(omega[i], pw); pw = qrMul(pw, xinv); }
+        let den = 0; for (let j = 1; j <= L; j += 2) den ^= qrMul(C[j] || 0, QR_EXP[(255 - (n - 1 - p)) * (j - 1) % 255]);
+        if (!den) return; block[p] ^= qrMul(qrMul(num, xi), QR_EXP[255 - QR_LOG[den]]);
+    });
+    for (let i = 0; i < nEc; i++) { let s = 0; for (let j = 0; j < n; j++) s = qrMul(s, QR_EXP[i]) ^ block[j]; if (s) return false; }
+    return true;
+}
+function qrDecodeGrid(g, dim) {
+    const ver = (dim - 17) / 4, f = qrReadFormat(g, dim); if (!f) return null;
+    const eclMap = [1, 0, 3, 2], ecl = eclMap[f.eclBits];        // bits de format -> L=0,M=1,Q=2,H=3
+    const fnm = qrFunctionMask(ver), maskFn = [(x, y) => (x + y) % 2 === 0, (x, y) => y % 2 === 0, (x, y) => x % 3 === 0, (x, y) => (x + y) % 3 === 0, (x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0, (x, y) => x * y % 2 + x * y % 3 === 0, (x, y) => (x * y % 2 + x * y % 3) % 2 === 0, (x, y) => ((x + y) % 2 + x * y % 3) % 2 === 0][f.mask];
+    const raw = []; let cur = 0, nb = 0;
+    for (let right = dim - 1; right >= 1; right -= 2) {
+        if (right === 6) right = 5;
+        for (let vert = 0; vert < dim; vert++) for (let j = 0; j < 2; j++) {
+            const x = right - j, up = ((right + 1) & 2) === 0, y = up ? dim - 1 - vert : vert;
+            if (fnm[y * dim + x]) continue;
+            let v = g[y * dim + x]; if (maskFn(x, y)) v ^= 1;
+            cur = (cur << 1) | v; if (++nb === 8) { raw.push(cur); cur = 0; nb = 0; }
+        }
+    }
+    const nBlocks = QR_BLOCKS[ecl][ver], ecLen = QR_EC_PER_BLOCK[ecl][ver], total = Math.floor(qrNumRawModules(ver) / 8);
+    const nShort = nBlocks - total % nBlocks, shortLen = Math.floor(total / nBlocks), blocks = [];
+    for (let i = 0; i < nBlocks; i++) blocks.push(new Array(shortLen + (i < nShort ? 0 : 1)).fill(0));
+    let k = 0;
+    for (let i = 0; i <= shortLen; i++) for (let j = 0; j < nBlocks; j++) {
+        if (i === shortLen - ecLen && j < nShort) { /* octet de bourrage absent des blocs courts */ }
+        if (i < blocks[j].length) {
+            // les blocs courts n'ont pas d'octet à la position shortLen - ecLen + ... : décalage géré ci-dessous
+        }
+    }
+    // dés-entrelacement explicite
+    k = 0; const dataLens = blocks.map((b, j) => b.length - ecLen);
+    const maxData = Math.max(...dataLens);
+    for (let i = 0; i < maxData; i++) for (let j = 0; j < nBlocks; j++) if (i < dataLens[j]) blocks[j][i] = raw[k++];
+    for (let i = 0; i < ecLen; i++) for (let j = 0; j < nBlocks; j++) blocks[j][dataLens[j] + i] = raw[k++];
+    const data = [];
+    for (let j = 0; j < nBlocks; j++) { if (!qrRsCorrect(blocks[j], ecLen)) return null; for (let i = 0; i < dataLens[j]; i++) data.push(blocks[j][i]); }
+    // segments : on ne gère que le mode octets
+    let bp = 0; const rb = n => { let v = 0; for (let i = 0; i < n; i++) { v = (v << 1) | ((data[bp >>> 3] >>> (7 - (bp & 7))) & 1); bp++; } return v; };
+    const out = [];
+    while (bp + 4 <= data.length * 8) {
+        const mode = rb(4); if (mode === 0) break;
+        if (mode !== 4) return null;
+        const cnt = rb(ver < 10 ? 8 : 16); for (let i = 0; i < cnt; i++) out.push(rb(8));
+    }
+    return Uint8Array.from(out);
+}
+function qrDecodeGray(gray, w, h) {
+    const bin = qrBinarize(gray, w, h), cands = qrFindFinders(bin, w, h);
+    if (cands.length < 3) return null;
+    for (const T of qrChooseTriples(cands)) {
+        const { tl, tr: TR, bl, ms } = T;
+        const dTop = Math.hypot(TR.x - tl.x, TR.y - tl.y), dLeft = Math.hypot(bl.x - tl.x, bl.y - tl.y);
+        const dim0 = Math.round(((dTop + dLeft) / 2 / ms + 7 - 17) / 4) * 4 + 17;
+        for (const dim of [dim0, dim0 - 4, dim0 + 4]) {
+            if (dim < 21 || dim > 177) continue;
+            const ver = (dim - 17) / 4, c = 3.5;
+            const brx = TR.x + bl.x - tl.x, bry = TR.y + bl.y - tl.y;
+            const Pplain = qrHomography([[c, c], [dim - c, c], [c, dim - c], [dim - c, dim - c]], [[tl.x, tl.y], [TR.x, TR.y], [bl.x, bl.y], [brx, bry]]);
+            if (!Pplain) continue;
+            const variants = [];
+            if (ver >= 2) {
+                const ap = qrAlignPositions(ver), src = [[c, c], [dim - c, c], [c, dim - c]], dst = [[tl.x, tl.y], [TR.x, TR.y], [bl.x, bl.y]];
+                let Pc = Pplain;
+                for (let pass = 0; pass < 2; pass++) {
+                    const S = src.slice(), D = dst.slice();
+                    ap.forEach((ai, i) => ap.forEach((aj, j) => {
+                        if ((i === 0 && j === 0) || (i === 0 && j === ap.length - 1) || (i === ap.length - 1 && j === 0)) return;
+                        const [ex, ey] = Pc(ai + 0.5, aj + 0.5), f = qrFindAlign(bin, w, h, ex, ey, ms, pass === 0 ? ms * 4 : ms * 1.5);
+                        if (f) { S.push([ai + 0.5, aj + 0.5]); D.push([f.x, f.y]); }
+                    }));
+                    if (S.length < 4) break;
+                    const P2 = qrHomography(S, D); if (!P2) break; Pc = P2;
+                    if (pass === 1 || S.length === 4 && false) variants.push(P2);
+                }
+                if (Pc !== Pplain && !variants.length) variants.push(Pc);
+            }
+            variants.push(Pplain);
+            for (const P of variants) {
+                let res = qrDecodeGrid(qrSampleGray(gray, w, h, bin.integral, P, dim, ms), dim); if (res) return res;
+                res = qrDecodeGrid(qrSample(bin, w, h, P, dim), dim); if (res) return res;
+            }
+        }
+    }
+    return null;
+}
+
+// ── Transfert par QR animés : en-tête commun (13 octets) ──
+// 'V' 'Q' | drapeaux (bit0 = compressé) | id de session (2) | n° d'image (2) | total (2) | CRC32 des données (4)
+const QRX_HEAD = 13;
+function qrxCrc32(b) {
+    let c, crc = 0xFFFFFFFF;
+    if (!qrxCrc32.t) { qrxCrc32.t = new Uint32Array(256); for (let n = 0; n < 256; n++) { c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; qrxCrc32.t[n] = c >>> 0; } }
+    for (let i = 0; i < b.length; i++) crc = qrxCrc32.t[(crc ^ b[i]) & 255] ^ (crc >>> 8);
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+// ───────── Réception depuis l'ordinateur par codes QR animés ─────────
+const RX = { stream: null, raf: 0, last: 0, sid: -1, total: 0, got: {}, flags: 0, crc: 0, busy: false, done: false };
+function rxReset() { RX.sid = -1; RX.total = 0; RX.got = {}; RX.done = false; }
+function rxProgress() {
+  const n = Object.keys(RX.got).length, el = $('scanInfo'), bar = $('scanBar');
+  if (!RX.total) { el.textContent = 'Pointez l\'appareil vers l\'écran de l\'ordinateur…'; bar.innerHTML = ''; return; }
+  el.textContent = `Images reçues : ${n} / ${RX.total}`;
+  bar.innerHTML = Array.from({ length: RX.total }, (_, i) => `<i class="${RX.got[i] ? 'on' : ''}"></i>`).join('');
+}
+async function startScan() {
+  if (nDirty() && !confirm('Des modifications n\'ont pas été exportées. Recevoir un nouveau fichier les effacera. Continuer ?')) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alert('La caméra n\'est pas accessible ici (il faut ouvrir l\'application depuis son adresse https ou depuis l\'écran d\'accueil).'); return; }
+  rxReset(); $('scan').classList.remove('hidden'); document.body.style.overflow = 'hidden'; rxProgress();
+  try {
+    RX.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    const v = $('scanVideo'); v.srcObject = RX.stream; await v.play();
+    RX.raf = requestAnimationFrame(scanLoop);
+  } catch (e) { stopScan(); alert('Accès à la caméra refusé. Autorisez la caméra pour cette application (Réglages › Safari › Caméra) puis réessayez.'); }
+}
+function stopScan() {
+  cancelAnimationFrame(RX.raf); RX.raf = 0;
+  if (RX.stream) { RX.stream.getTracks().forEach(t => t.stop()); RX.stream = null; }
+  $('scan').classList.add('hidden'); document.body.style.overflow = '';
+}
+function scanLoop(ts) {
+  RX.raf = requestAnimationFrame(scanLoop);
+  if (RX.busy || ts - RX.last < 90) return;
+  const v = $('scanVideo'); if (!v.videoWidth) return;
+  RX.last = ts; RX.busy = true;
+  try {
+    const cv = $('scanCanvas'), W = Math.min(1280, v.videoWidth), H = Math.round(W * v.videoHeight / v.videoWidth);
+    cv.width = W; cv.height = H;
+    const c = cv.getContext('2d', { willReadFrequently: true }); c.drawImage(v, 0, 0, W, H);
+    const d = c.getImageData(0, 0, W, H).data, gray = new Uint8Array(W * H);
+    for (let i = 0, j = 0; i < d.length; i += 4, j++) gray[j] = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
+    const res = qrDecodeGray(gray, W, H);
+    if (res) rxFrame(res);
+  } catch (e) { /* image illisible : on continue */ }
+  RX.busy = false;
+}
+function rxFrame(b) {
+  if (b.length < QRX_HEAD || b[0] !== 0x56 || b[1] !== 0x51) return;
+  const flags = b[2], sid = (b[3] << 8) | b[4], idx = (b[5] << 8) | b[6], total = (b[7] << 8) | b[8], crc = ((b[9] << 24) | (b[10] << 16) | (b[11] << 8) | b[12]) >>> 0;
+  if (!total || idx >= total) return;
+  if (sid !== RX.sid || total !== RX.total) { rxReset(); RX.sid = sid; RX.total = total; RX.flags = flags; RX.crc = crc; }
+  if (RX.got[idx]) return;
+  RX.got[idx] = b.slice(QRX_HEAD); rxProgress();
+  if (navigator.vibrate) navigator.vibrate(8);
+  if (Object.keys(RX.got).length === RX.total && !RX.done) { RX.done = true; rxFinish(); }
+}
+async function rxInflate(bytes) {
+  if (typeof DecompressionStream === 'undefined') throw new Error('Mise à jour d\'iOS nécessaire (16.4 ou plus) pour décompresser les données.');
+  const ds = new DecompressionStream('deflate-raw'), w = ds.writable.getWriter(); w.write(bytes); w.close();
+  return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+}
+async function rxFinish() {
+  try {
+    let len = 0; for (let i = 0; i < RX.total; i++) len += RX.got[i].length;
+    const all = new Uint8Array(len); let p = 0; for (let i = 0; i < RX.total; i++) { all.set(RX.got[i], p); p += RX.got[i].length; }
+    if (qrxCrc32(all) !== RX.crc) throw new Error('Données corrompues : recommencez la réception.');
+    const raw = (RX.flags & 1) ? await rxInflate(all) : all;
+    const o = JSON.parse(new TextDecoder().decode(raw));
+    if (!o || typeof o !== 'object' || !o.dataStore) throw new Error('Données inattendues.');
+    stopScan();
+    obj = o; journal = []; const now = new Date();
+    fileName = 'Reçu par QR ' + now.toLocaleDateString('fr-FR') + '.json';
+    loadedAt = now.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+    ui = { tab: 'home', disc: null, teacher: null, discTab: 'services', q: '', tq: '' };
+    persist(); render(); toast('Fichier reçu par QR');
+  } catch (e) { rxReset(); rxProgress(); $('scanInfo').textContent = (e && e.message) || 'Erreur de réception'; }
+}
+
+// ───────── Codes QR : encodeur maison ─────────
+// ── QR : encodeur (mode octets) ──
+function qrRsGenerator(deg) {
+    let r = [1];
+    for (let i = 0; i < deg; i++) { const n = new Array(r.length + 1).fill(0); for (let j = 0; j < r.length; j++) { n[j] ^= r[j]; n[j + 1] ^= qrMul(r[j], QR_EXP[i]); } r = n; }
+    return r.slice(1);
+}
+function qrRsRemainder(data, gen) {
+    const res = new Array(gen.length).fill(0);
+    data.forEach(b => { const f = b ^ res.shift(); res.push(0); gen.forEach((c, i) => { res[i] ^= qrMul(c, f); }); });
+    return res;
+}
+function qrEncodeBytes(bytes, eclName, minVer, forceMask) {
+    const ecl = QR_ECC[eclName || 'M'];
+    let ver = Math.max(1, minVer || 1), bits;
+    for (; ; ver++) {
+        if (ver > 40) throw new Error('trop volumineux');
+        const cap = qrNumDataCodewords(ver, ecl) * 8, cc = ver < 10 ? 8 : 16;
+        if (4 + cc + bytes.length * 8 <= cap) break;
+    }
+    const cc = ver < 10 ? 8 : 16; bits = [];
+    const put = (v, n) => { for (let i = n - 1; i >= 0; i--) bits.push((v >>> i) & 1); };
+    put(4, 4); put(bytes.length, cc); bytes.forEach(b => put(b, 8));
+    const capBits = qrNumDataCodewords(ver, ecl) * 8;
+    put(0, Math.min(4, capBits - bits.length)); put(0, (8 - bits.length % 8) % 8);
+    for (let pad = 0xEC; bits.length < capBits; pad ^= 0xEC ^ 0x11) put(pad, 8);
+    const data = []; for (let i = 0; i < bits.length; i += 8) { let v = 0; for (let j = 0; j < 8; j++) v = (v << 1) | bits[i + j]; data.push(v); }
+    // blocs + correction d'erreurs + entrelacement
+    const nb = QR_BLOCKS[ecl][ver], ecLen = QR_EC_PER_BLOCK[ecl][ver], raw = Math.floor(qrNumRawModules(ver) / 8);
+    const nShort = nb - raw % nb, shortLen = Math.floor(raw / nb), gen = qrRsGenerator(ecLen), blocks = [];
+    for (let i = 0, k = 0; i < nb; i++) {
+        const len = shortLen - ecLen + (i < nShort ? 0 : 1), d = data.slice(k, k + len); k += len;
+        const e = qrRsRemainder(d, gen); if (i < nShort) d.push(0); blocks.push(d.concat(e));
+    }
+    const all = [];
+    for (let i = 0; i < blocks[0].length; i++) blocks.forEach((b, j) => { if (i !== shortLen - ecLen || j >= nShort) all.push(b[i]); });
+    // matrice
+    const size = ver * 4 + 17, mod = new Uint8Array(size * size), fn = new Uint8Array(size * size);
+    const set = (x, y, v) => { if (x >= 0 && y >= 0 && x < size && y < size) { mod[y * size + x] = v ? 1 : 0; fn[y * size + x] = 1; } };
+    for (let i = 0; i < size; i++) { set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+    [[3, 3], [size - 4, 3], [3, size - 4]].forEach(([cx, cy]) => { for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const d = Math.max(Math.abs(dx), Math.abs(dy)); set(cx + dx, cy + dy, d !== 2 && d !== 4); } });
+    const ap = qrAlignPositions(ver);
+    ap.forEach((cx, i) => ap.forEach((cy, j) => {
+        if ((i === 0 && j === 0) || (i === 0 && j === ap.length - 1) || (i === ap.length - 1 && j === 0)) return;
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) set(cx + dx, cy + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+    }));
+    const drawFormat = mask => {
+        const d = (QR_ECC_FORMAT_BITS[ecl] << 3) | mask; let rem = d;
+        for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+        const bitsF = ((d << 10) | rem) ^ 0x5412, g = i => ((bitsF >>> i) & 1) !== 0;
+        for (let i = 0; i <= 5; i++) set(8, i, g(i)); set(8, 7, g(6)); set(8, 8, g(7)); set(7, 8, g(8));
+        for (let i = 9; i < 15; i++) set(14 - i, 8, g(i));
+        for (let i = 0; i < 8; i++) set(size - 1 - i, 8, g(i));
+        for (let i = 8; i < 15; i++) set(8, size - 15 + i, g(i));
+        set(8, size - 8, true);
+    };
+    drawFormat(0);
+    if (ver >= 7) {
+        let rem = ver; for (let i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1F25);
+        const bitsV = (ver << 12) | rem;
+        for (let i = 0; i < 18; i++) { const a = size - 11 + i % 3, b = Math.floor(i / 3), v = ((bitsV >>> i) & 1) !== 0; set(a, b, v); set(b, a, v); }
+    }
+    // données (zigzag)
+    let bi = 0;
+    for (let right = size - 1; right >= 1; right -= 2) {
+        if (right === 6) right = 5;
+        for (let vert = 0; vert < size; vert++) for (let j = 0; j < 2; j++) {
+            const x = right - j, up = ((right + 1) & 2) === 0, y = up ? size - 1 - vert : vert;
+            if (!fn[y * size + x] && bi < all.length * 8) { mod[y * size + x] = (all[bi >>> 3] >>> (7 - (bi & 7))) & 1; bi++; }
+        }
+    }
+    // choix du masque (pénalités simplifiées conformes à la norme)
+    const maskFn = [(x, y) => (x + y) % 2 === 0, (x, y) => y % 2 === 0, (x, y) => x % 3 === 0, (x, y) => (x + y) % 3 === 0, (x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0, (x, y) => x * y % 2 + x * y % 3 === 0, (x, y) => (x * y % 2 + x * y % 3) % 2 === 0, (x, y) => ((x + y) % 2 + x * y % 3) % 2 === 0];
+    const penalty = m => {
+        let p = 0;
+        for (let t = 0; t < 2; t++) for (let a = 0; a < size; a++) {
+            let run = 1, last = -1;
+            for (let b = 0; b < size; b++) { const v = t ? m[b * size + a] : m[a * size + b]; if (v === last) { run++; if (run === 5) p += 3; else if (run > 5) p++; } else { run = 1; last = v; } }
+        }
+        for (let y = 0; y < size - 1; y++) for (let x = 0; x < size - 1; x++) { const c = m[y * size + x]; if (c === m[y * size + x + 1] && c === m[(y + 1) * size + x] && c === m[(y + 1) * size + x + 1]) p += 3; }
+        let dark = 0; m.forEach(v => { dark += v; }); p += Math.floor(Math.abs(dark * 20 - size * size * 10) / (size * size)) * 10;
+        return p;
+    };
+    let best = 0, bestP = Infinity, bestM = null;
+    for (let k = 0; k < 8; k++) {
+        if (forceMask !== undefined && forceMask !== k) continue;
+        const m = mod.slice();
+        for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (!fn[y * size + x] && maskFn[k](x, y)) m[y * size + x] ^= 1;
+        const p = penalty(m); if (p < bestP) { bestP = p; best = k; bestM = m; }
+    }
+    const out = bestM, savedFn = fn;
+    // écrire les bits de format du masque retenu dans la matrice finale
+    const d = (QR_ECC_FORMAT_BITS[ecl] << 3) | best; let rem = d; for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+    const bitsF = ((d << 10) | rem) ^ 0x5412, g = i => ((bitsF >>> i) & 1);
+    const w = (x, y, v) => { out[y * size + x] = v; };
+    for (let i = 0; i <= 5; i++) w(8, i, g(i)); w(8, 7, g(6)); w(8, 8, g(7)); w(7, 8, g(8));
+    for (let i = 9; i < 15; i++) w(14 - i, 8, g(i));
+    for (let i = 0; i < 8; i++) w(size - 1 - i, 8, g(i));
+    for (let i = 8; i < 15; i++) w(8, size - 15 + i, g(i));
+    w(8, size - 8, 1);
+    return { size, ver, modules: out };
+}
+// Dessine la matrice dans un canvas (zone silencieuse de 4 modules)
+function qrDraw(canvas, qr, px) {
+    const q = 4, n = qr.size + q * 2, c = canvas.getContext('2d');
+    canvas.width = canvas.height = n * px;
+    c.fillStyle = '#fff'; c.fillRect(0, 0, canvas.width, canvas.height); c.fillStyle = '#000';
+    for (let y = 0; y < qr.size; y++) for (let x = 0; x < qr.size; x++) if (qr.modules[y * qr.size + x]) c.fillRect((x + q) * px, (y + q) * px, px, px);
+}
+
+
+// ───────── Envoi vers l'ordinateur par codes QR animés (modifications) ─────────
+const SND = { frames: [], idx: 0, timer: null, chunk: 600, fps: 4, paused: false };
+async function sndDeflate(bytes) {
+  const cs = new CompressionStream('deflate-raw'), w = cs.writable.getWriter(); w.write(bytes); w.close();
+  return new Uint8Array(await new Response(cs.readable).arrayBuffer());
+}
+function deltaPayload() {
+  const ep = (obj.epleIdentity || {}), now = new Date();
+  return { format: 'vectis-modifications', version: 1, createdAt: now.toISOString(), source: 'VectisDHG Compagnon', sourceFile: fileName, eple: { name: ep.name || '', uai: ep.uai || '' }, ops: journal };
+}
+async function sndPrepare() {
+  const raw = new TextEncoder().encode(JSON.stringify(deltaPayload()));
+  let data = raw, flags = 0;
+  if (typeof CompressionStream !== 'undefined') { data = await sndDeflate(raw); flags = 1; }
+  const sid = Math.floor(Math.random() * 65535), total = Math.max(1, Math.ceil(data.length / SND.chunk)), crc = qrxCrc32(data), bufs = [];
+  for (let i = 0; i < total; i++) {
+    const part = data.subarray(i * SND.chunk, (i + 1) * SND.chunk), f = new Uint8Array(QRX_HEAD + part.length);
+    f[0] = 0x56; f[1] = 0x51; f[2] = flags; f[3] = sid >> 8; f[4] = sid & 255; f[5] = i >> 8; f[6] = i & 255; f[7] = total >> 8; f[8] = total & 255;
+    f[9] = crc >>> 24; f[10] = (crc >>> 16) & 255; f[11] = (crc >>> 8) & 255; f[12] = crc & 255; f.set(part, QRX_HEAD); bufs.push(f);
+  }
+  let ver = 1; const first = bufs.map(b => qrEncodeBytes(b, 'M')); first.forEach(q => { ver = Math.max(ver, q.ver); });
+  SND.frames = first.map((q, i) => q.ver === ver ? q : qrEncodeBytes(bufs[i], 'M', ver));
+}
+function sndShow() {
+  const cv = $('sndCanvas'); if (!cv || !SND.frames.length) return;
+  const q = SND.frames[SND.idx], px = Math.max(3, Math.floor(Math.min(560, window.innerWidth - 24) / (q.size + 8)));
+  qrDraw(cv, q, px); $('sndCount').textContent = `Image ${SND.idx + 1} / ${SND.frames.length}`;
+}
+function sndTimer() { clearInterval(SND.timer); SND.timer = setInterval(() => { if (SND.paused || !SND.frames.length) return; SND.idx = (SND.idx + 1) % SND.frames.length; sndShow(); }, Math.round(1000 / SND.fps)); }
+async function startSend() {
+  if (!journal.length) return;
+  $('snd').classList.remove('hidden'); document.body.style.overflow = 'hidden';
+  await sndRebuild();
+}
+async function sndRebuild() {
+  $('sndCount').textContent = 'Préparation…';
+  try { await sndPrepare(); SND.idx = 0; SND.paused = false; $('sndPause').textContent = '⏸ Pause'; sndShow(); sndTimer(); }
+  catch (e) { $('sndCount').textContent = 'Préparation impossible : ' + ((e && e.message) || e); }
+}
+function stopSend() { clearInterval(SND.timer); SND.timer = null; $('snd').classList.add('hidden'); document.body.style.overflow = ''; }
+function sndSetChunk(v) { SND.chunk = parseInt(v); sndRebuild(); }
+function sndSetFps(v) { SND.fps = parseInt(v); sndTimer(); }
+function sndTogglePause() { SND.paused = !SND.paused; $('sndPause').textContent = SND.paused ? '▶ Reprendre' : '⏸ Pause'; }
 
 // ───────── Démarrage ─────────
 restore();
