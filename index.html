@@ -116,6 +116,9 @@ input.txt{margin-bottom:12px}
 .snd-stage canvas{max-width:100%;height:auto;image-rendering:pixelated}
 .snd-count{font-weight:650}
 .snd-adv{font-size:.85rem;text-align:center}.snd-ctl{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.vent .vt{display:flex;align-items:baseline;gap:8px;margin:2px 0 6px}.vent .vt strong{font-size:1.5rem}.vent .vt span{color:var(--muted);font-size:.8rem}
+.vent .vl{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--line,var(--border,#e2e8f0));font-size:.88rem}
+.vent .vl span{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -256,10 +259,12 @@ function discSummary(disc) {
 }
 function globalStats() {
   const hp = num(obj.dotation && obj.dotation.hp), hsa = num(obj.dotation && obj.dotation.hsa), dgh = hp + hsa;
-  let used = 0, todoH = 0, nTodo = 0, nOver = 0; const alerts = [];
+  let used = 0, todoH = 0, nTodo = 0, nOver = 0, vol = 0, nServ = 0, usedRaw = 0, pondReal = 0, areTot = 0, pondEst = 0; const alerts = [];
   Object.keys(store()).forEach(d => {
-    const s = discSummary(d); used += s.total;
+    const s = discSummary(d); used += s.total; usedRaw += s.raw; pondReal += s.pond; areTot += s.are;
     s.svcs.forEach(x => {
+      vol += x.target; nServ++;
+      if (pondOn() && x.sv.ponderationActive) pondEst += Math.max(0, x.target - x.done) * ((num(x.sv.ponderationFactor) || 1.1) - 1);
       if (x.co) return;
       const lab = `${x.sv.name || '(sans intitulé)'}${x.sv.level ? ' (' + x.sv.level + ')' : ''}`;
       if (x.target > 0 && x.done === 0) { alerts.push({ sev: 'bad', disc: d, t: lab, m: `Aucune heure ventilée : ${fr(x.target)} h à attribuer` }); nTodo++; todoH += x.target; }
@@ -267,7 +272,8 @@ function globalStats() {
       else if (x.diff < -0.004) { alerts.push({ sev: 'warn', disc: d, t: lab, m: `Sur-ventilé de ${fr(-x.diff)} h` }); nOver++; }
     });
   });
-  return { hp, hsa, dgh, used, remaining: dgh - used, todoH, nTodo, nOver, alerts };
+  const pondTot = pondReal + pondEst, ventTot = vol + pondTot + areTot;
+  return { hp, hsa, dgh, used, remaining: dgh - used, todoH, nTodo, nOver, alerts, vol, nServ, usedRaw, pondReal, pondEst, pondTot, areTot, ventTot, ventRest: dgh - ventTot, toVent: Math.max(0, vol - usedRaw) };
 }
 const noteOf = d => (store()[d] && store()[d].note) || '';
 const nDirty = () => journal.length;
@@ -316,6 +322,17 @@ function viewHome() {
     <div class="kpi wide"><span>${lab}</span><strong style="color:var(${over ? '--bad' : '--ok'})">${over ? '+' : ''}${fr(Math.abs(g.remaining), 2)} h</strong>
       <div class="bar"><i class="${over ? 'over' : ''}" style="width:${pct}%"></i></div><small>${fr(g.dgh > 0 ? g.used / g.dgh * 100 : 0, 1)} % de la dotation utilisée</small></div>
   </div>
+  <div class="card vent"><h2>À ventiler</h2>
+    <div class="vt"><strong>${fr(g.ventTot, 2)} h</strong><span>total à ventiler</span></div>
+    <div class="bar"><i class="${g.ventRest < -0.004 ? 'over' : ''}" style="width:${g.dgh > 0 ? Math.min(100, Math.max(0, g.ventTot / g.dgh * 100)) : 0}%"></i></div>
+    <div class="vl"><span>Services créés (${g.nServ})</span><b>${fr(g.vol, 2)} h</b></div>
+    ${pondOn() ? `<div class="vl"><span>+ Pondérations</span><b>${fr(g.pondTot, 2)} h</b></div>` : ''}
+    <div class="vl"><span>+ ARE</span><b>${fr(g.areTot, 2)} h</b></div>
+    <div class="vl"><span>Dotation</span><b>${fr(g.dgh, 2)} h</b></div>
+    <div class="vl"><span>Dotation − total à ventiler</span><b style="color:var(${g.ventRest < -0.004 ? '--bad' : '--ok'})">${g.ventRest > 0.004 ? '+' : ''}${fr(g.ventRest, 2)} h</b></div>
+    <div class="vl"><span>Heures de services déjà ventilées</span><b>${fr(g.usedRaw, 2)} h</b></div>
+    <div class="vl"><span>Heures de services restantes</span><b>${fr(g.toVent, 2)} h</b></div>
+    ${pondOn() && g.pondEst > 0.004 ? `<div class="note">Pondérations : dont ${fr(g.pondEst, 2)} h estimées sur les heures non encore ventilées.</div>` : ''}</div>
   <div class="card"><h2>À surveiller · ${g.nTodo} service${g.nTodo > 1 ? 's' : ''} à ventiler${g.nOver ? ` · ${g.nOver} sur-ventilé${g.nOver > 1 ? 's' : ''}` : ''}</h2>
     ${al || '<div class="empty" style="padding:12px">✅ Tous les services sont ventilés.</div>'}
     ${g.alerts.length > 8 ? `<div class="note">… et ${g.alerts.length - 8} autres (voir chaque discipline).</div>` : ''}</div>`;
