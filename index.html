@@ -190,6 +190,13 @@ html[data-style="glass"] .toast{bottom:calc(var(--nav-h) + env(safe-area-inset-b
 .sty i{display:block;height:38px;border-radius:10px;margin-bottom:6px}
 .sty .s1 i{background:var(--bg);border:1px solid var(--line)}
 .sty .s2 i{background:radial-gradient(70% 90% at 20% 20%,rgba(96,165,250,.9),transparent),radial-gradient(70% 90% at 90% 80%,rgba(192,132,252,.8),transparent),#cfe0ff;box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:999px;padding:10px 15px;font-size:.95rem;font-weight:650;min-height:44px}
+.chips button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.chips.small button{padding:6px 12px;font-size:.82rem;min-height:36px;font-weight:600;color:var(--muted)}
+.nsgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.nsgrid .stepper{justify-content:space-between}.nsgrid .stepper input{width:100%;min-width:0;flex:1}.nsgrid .stepper button{width:40px;flex:none}
+.tgl{display:flex;align-items:center;gap:10px;padding:12px 2px;font-weight:600}.tgl input{width:22px;height:22px}
 </style>
 </head>
 <body>
@@ -420,7 +427,7 @@ function viewDiscDetail(d) {
   const head = `<div class="kpis"><div class="kpi"><span>Volume ventilé</span><strong>${fh(s.raw, data)}</strong></div><div class="kpi"><span>HSA</span><strong style="color:var(${s.hsa < -0.004 ? '--bad' : '--ok'})">${fh(s.hsa, data, true)}</strong></div></div>`;
   let body = '';
   if (ui.discTab === 'services') {
-    body = `<div class="card">${s.svcs.length ? s.svcs.map(x => {
+    body = `<button class="btn" onclick="openNewService(${JSON.stringify(d).replace(/"/g, '&quot;')})">＋ Nouveau service</button><div class="card">${s.svcs.length ? s.svcs.map(x => {
       const bd = x.co ? '<span class="badge b-gray">co-ens.</span>' : (x.diff > 0.004 ? `<span class="badge b-bad">reste ${fh(x.diff, data)}</span>` : (x.diff < -0.004 ? `<span class="badge b-warn">+${fh(-x.diff, data)}</span>` : '<span class="badge b-ok">ventilé</span>'));
       const who = Object.entries(x.sv.allocations || {}).filter(([, v]) => num(v) > 0).map(([t, v]) => `${esc(t)} ${fh(num(v), data)}`).join(' · ');
       const dq = JSON.stringify(d).replace(/"/g, '&quot;');
@@ -473,6 +480,7 @@ function opText(o) {
   if (o.k === 'alloc') return `⏱️ ${o.teacher} · ${o.svc || 'service'}${o.level ? ' (' + o.level + ')' : ''} : ${fr(o.from)} → ${fr(o.to)} h`;
   if (o.k === 'tadd') return `➕ ${o.name} (${d}), ORS ${fr(o.ors)} h`;
   if (o.k === 'trename') return `✏️ ${o.from} → ${o.to} (${d})`;
+  if (o.k === 'sadd') return `➕ Nouveau service : ${o.svc || 'service'}${o.level ? ' (' + o.level + ')' : ''} — ${fr(o.classes, 1)} cl. × ${fr(o.hours)} h (${d})`;
   if (o.k === 'lock') return `${o.to ? '🔒 Verrouillé' : '🔓 Déverrouillé'} : ${o.svc || 'service'}${o.level ? ' (' + o.level + ')' : ''} — ${d}`;
   if (o.k === 'tors') return `🎓 ${o.teacher} : ORS ${fr(o.from)} → ${fr(o.to)} h`;
   return o.k;
@@ -640,6 +648,65 @@ const parseH = v => { const x = parseFloat(String(v).replace(',', '.')); return 
 function openSheet(html) { $('sheetCard').innerHTML = html; $('sheet').classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
 function closeSheet() { $('sheet').classList.add('hidden'); document.body.style.overflow = ''; sheet = null; render(); }
 
+// ───────── Création d'un service (feuille mobile) ─────────
+let NS = null;
+function nsLevels(d) {
+  const L = levelsList().slice();
+  ((store()[d] && store()[d].services) || []).forEach(sv => svcLevels(sv).forEach(l => { if (l && l !== 'Non défini' && !L.includes(l)) L.push(l); }));
+  return L;
+}
+function openNewService(d) {
+  const data = store()[d]; if (!data) return;
+  const L = nsLevels(d), last = (data.services || []).filter(x => x.level).slice(-1)[0];
+  NS = { d, level: (last && last.level) || L[0] || '', name: '', classes: 1, hours: 1, pond: false, spe: false };
+  const names = []; (data.services || []).forEach(x => { if (x.name && !names.includes(x.name)) names.push(x.name); });
+  const q = s => JSON.stringify(s).replace(/"/g, '&quot;');
+  sheet = { type: 'new' };
+  openSheet(`<div class="sh-head"><div><strong>Nouveau service</strong><div class="s" style="font-size:.8rem;color:var(--muted)">${esc(d)}</div></div><button class="back" onclick="closeSheet()">Annuler</button></div>
+    <span class="lbl">Niveau</span>
+    <div class="chips" id="nsLv">${L.length ? L.map(l => `<button type="button" class="${l === NS.level ? 'on' : ''}" onclick="nsLevel(${q(l)})">${esc(l)}</button>`).join('') : '<input class="txt" id="nsLvTxt" placeholder="Niveau" oninput="NS.level=this.value;nsCheck()">'}</div>
+    <span class="lbl" style="margin-top:12px">Intitulé</span>
+    <input class="txt" id="nsName" type="text" placeholder="Ex. Maths 6ème, Spécialité NSI…" autocapitalize="sentences" autocomplete="off" oninput="NS.name=this.value;nsCheck()" style="margin-bottom:6px">
+    ${names.length ? `<div class="chips small" id="nsNames">${names.slice(-6).map(n => `<button type="button" onclick="nsName(${q(n)})">${esc(n)}</button>`).join('')}</div>` : ''}
+    <div class="nsgrid">
+      <div><span class="lbl">Classes</span><div class="stepper"><button type="button" onclick="nsStep('classes',-1)" aria-label="Moins">−</button><input id="nsCl" type="text" inputmode="decimal" value="1" onchange="nsSet('classes',this.value)" onfocus="this.select()"><button type="button" onclick="nsStep('classes',1)" aria-label="Plus">+</button></div></div>
+      <div><span class="lbl">Heures / classe</span><div class="stepper"><button type="button" onclick="nsStep('hours',-0.5)" aria-label="Moins">−</button><input id="nsHr" type="text" inputmode="decimal" value="1" onchange="nsSet('hours',this.value)" onfocus="this.select()"><button type="button" onclick="nsStep('hours',0.5)" aria-label="Plus">+</button></div></div>
+    </div>
+    <div class="chips small" style="margin-top:8px">${[1, 2, 3, 4, 5].map(h => `<button type="button" onclick="nsSet('hours',${h})">${h} h</button>`).join('')}</div>
+    ${pondOn() ? `<label class="tgl"><input type="checkbox" onchange="NS.pond=this.checked;nsSum()"> Pondération</label>` : ''}
+    ${data.enableSpecialites ? `<label class="tgl"><input type="checkbox" onchange="NS.spe=this.checked"> Enseignement de spécialité</label>` : ''}
+    <div class="sumbox" style="margin-top:12px"><div><span>Volume du service</span><strong id="nsTot">1 h</strong></div></div>
+    <button class="btn" id="nsGo" onclick="createService()" disabled>Créer et ventiler les heures</button>
+    <p class="note" style="margin-top:0">Le service sera ajouté dans VectisDHG Autonomie à la prochaine synchronisation (vous validez avant application).</p>`);
+}
+function nsLevel(l) { NS.level = l; document.querySelectorAll('#nsLv button').forEach(b => b.classList.toggle('on', b.textContent === l)); nsCheck(); }
+function nsName(n) { NS.name = n; $('nsName').value = n; nsCheck(); }
+function nsStep(k, dlt) { nsSet(k, Math.max(0, Math.round((NS[k] + dlt) * 100) / 100)); }
+function nsSet(k, v) { NS[k] = Math.max(0, typeof v === 'number' ? v : parseH(v)); $(k === 'classes' ? 'nsCl' : 'nsHr').value = fr(NS[k]); nsSum(); nsCheck(); }
+function nsSum() { const t = NS.classes * NS.hours, f = pondOn() && NS.pond ? 1.1 : 1; $('nsTot').textContent = fr(t, 2) + ' h' + (f > 1 ? ' (+ pond.)' : ''); }
+function nsCheck() { $('nsGo').disabled = !(NS.name.trim() && NS.level && NS.classes > 0 && NS.hours > 0); }
+function createService() {
+  if (!NS) return; const data = store()[NS.d]; if (!data) return;
+  const name = NS.name.trim(), level = NS.level;
+  if (!name || !level || !(NS.classes > 0) || !(NS.hours > 0)) return;
+  if ((data.services || []).some(x => (x.name || '') === name && (x.level || '') === level)) { toast('Un service identique existe déjà.'); return; }
+  const sv = { level, levels: [level], name, classes: r2(NS.classes), hours: r2(NS.hours), ponderationActive: !!(pondOn() && NS.pond), ponderationFactor: 1.1, isSpecialite: !!NS.spe, isOptionnel: false, isCoEnseignement: false, isMultiNiveau: false, locked: false, allocations: {} };
+  if (!data.services) data.services = [];
+  data.services.push(sv);
+  const si = data.services.length - 1;
+  journal.push({ k: 'sadd', disc: NS.d, sIndex: si, svc: name, level, classes: sv.classes, hours: sv.hours, pond: sv.ponderationActive, spe: sv.isSpecialite });
+  const d = NS.d; NS = null; save();
+  toast('Service créé');
+  openService(d, si);
+}
+function deleteNewService(od, si) {
+  const data = store()[od]; if (!data || si !== data.services.length - 1) return;
+  if (!journal.some(o => o.k === 'sadd' && o.disc === od && o.sIndex === si)) return;
+  if (!confirm('Supprimer ce service que vous venez de créer ?')) return;
+  data.services.pop();
+  for (let i = journal.length - 1; i >= 0; i--) { const o = journal[i]; if (o.disc === od && o.sIndex === si && (o.k === 'sadd' || o.k === 'alloc' || o.k === 'lock')) journal.splice(i, 1); }
+  save(); closeSheet();
+}
 function openService(od, si) {
   const sv = store()[od] && store()[od].services[si]; if (!sv) return;
   const names = [];
@@ -663,7 +730,8 @@ function renderServiceSheet() {
     <button type="button" class="btn sec lkbtn" onclick="toggleLock(${JSON.stringify(od).replace(/"/g, '&quot;')},${si},true)">${sv.locked ? '🔓 Déverrouiller ce service' : '🔒 Verrouiller ce service'}</button>
     <div id="svcSummary" class="sumbox"></div>
     ${ro ? `<p class="note" style="margin-top:0">${ro}</p>` : ''}
-    <div>${rows || '<div class="empty" style="padding:14px">Aucun enseignant dans cette discipline.</div>'}</div>`);
+    <div>${rows || '<div class="empty" style="padding:14px">Aucun enseignant dans cette discipline.</div>'}</div>
+    ${(si === data.services.length - 1 && journal.some(o => o.k === 'sadd' && o.disc === od && o.sIndex === si)) ? `<button type="button" class="btn dng" style="margin-top:14px" onclick="deleteNewService(${JSON.stringify(od).replace(/"/g, '&quot;')},${si})">🗑️ Supprimer ce service</button>` : ''}`);
   updateSheetSummary();
 }
 function stepAlloc(i, delta) {
